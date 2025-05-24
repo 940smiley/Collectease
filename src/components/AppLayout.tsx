@@ -6,7 +6,7 @@ import CategoryIcon from '@mui/icons-material/Category';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
 import ShareIcon from '@mui/icons-material/Share';
 import StorefrontIcon from '@mui/icons-material/Storefront';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, Outlet } from 'react-router-dom';
 
 const drawerWidth = 220;
 
@@ -18,7 +18,7 @@ const navItems = [
   { text: 'Marketplace', icon: <StorefrontIcon />, path: '/marketplace' },
 ];
 
-export default function AppLayout({ children }: { children: ReactNode }) {
+export default function AppLayout({ children }: { children?: ReactNode }) {
   const location = useLocation();
   return (
     <Box sx={{ display: 'flex' }}>
@@ -55,7 +55,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: 3, ml: `${drawerWidth}px` }}>
         <Toolbar />
-        {children}
+        {children || <Outlet />}
       </Box>
     </Box>
   );

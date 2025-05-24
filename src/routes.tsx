@@ -5,13 +5,20 @@ import Collection from './pages/Collection';
 import ImportExport from './pages/ImportExport';
 import Share from './pages/Share';
 import Marketplace from './pages/Marketplace';
+import AppLayout from './components/AppLayout';
 
 const routes: RouteObject[] = [
-  { path: '/', element: <Dashboard /> },
-  { path: '/collection', element: <Collection /> },
-  { path: '/import-export', element: <ImportExport /> },
-  { path: '/share', element: <Share /> },
-  { path: '/marketplace', element: <Marketplace /> },
+  {
+    path: '/',
+    element: <AppLayout />,
+    children: [
+      { path: '', element: <Dashboard /> },
+      { path: 'collection', element: <Collection /> },
+      { path: 'import-export', element: <ImportExport /> },
+      { path: 'share', element: <Share /> },
+      { path: 'marketplace', element: <Marketplace /> },
+    ],
+  },
 ];
 
 export default routes;

@@ -2,7 +2,6 @@ import { CssBaseline, ThemeProvider } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { useRoutes } from 'react-router-dom';
 
-import AppLayout from './components/AppLayout';
 import routes from './routes';
 
 import './App.css'
@@ -16,12 +15,7 @@ const theme = createTheme({
 });
 
 function App() {
-  const routing = useRoutes([
-    {
-      path: '/',
-      element: <AppLayout>{useRoutes(routes)}</AppLayout>,
-    },
-  ]);
+  const routing = useRoutes(routes);
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
