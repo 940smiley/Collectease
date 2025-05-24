@@ -1,13 +1,10 @@
-import { useState } from 'react'
-import { CssBaseline, ThemeProvider, Container, Typography } from '@mui/material';
+import { CssBaseline, ThemeProvider } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
-import { BrowserRouter, useRoutes } from 'react-router-dom';
+import { useRoutes } from 'react-router-dom';
 
 import AppLayout from './components/AppLayout';
 import routes from './routes';
 
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
 
 const theme = createTheme({
@@ -19,19 +16,18 @@ const theme = createTheme({
 });
 
 function App() {
-  const [count, setCount] = useState(0)
-
-  const AppRoutes = () => useRoutes(routes);
+  const routing = useRoutes([
+    {
+      path: '/',
+      element: <AppLayout>{useRoutes(routes)}</AppLayout>,
+    },
+  ]);
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <BrowserRouter>
-        <AppLayout>
-          <AppRoutes />
-        </AppLayout>
-      </BrowserRouter>
+      {routing}
     </ThemeProvider>
-  )
+  );
 }
 
 export default App

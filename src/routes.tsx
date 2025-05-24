@@ -1,5 +1,5 @@
 // App routes for Collectease
-import { RouteObject } from 'react-router-dom';
+import type { RouteObject } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Collection from './pages/Collection';
 import ImportExport from './pages/ImportExport';
