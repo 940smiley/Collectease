@@ -63,6 +63,27 @@ export default function ImportExport() {
     }
   };
 
+const handleExport = () => {
+  try {
+    const dataStr = JSON.stringify(dbImages, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    a.href = url;
+    const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = filename;
+    a.download = 'search-db-images.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Failed to export  error);
+    // Assuming you have some form of error notification system
+    // showError('Failed to export data. Please try again.');
+  }
+};
+    a.download = 'search-db-images.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Paper elevation={2} sx={{ p: 4 }}>
       <Typography variant="h5" gutterBottom>
@@ -174,7 +195,9 @@ export default function ImportExport() {
           </Box>
         </>
       )}
-      {/* TODO: Add export functionality here */}
+      <Button variant="outlined" sx={{ mt: 4 }} onClick={handleExport}>
+        Export Search Database
+      </Button>
     </Paper>
   );
 }
