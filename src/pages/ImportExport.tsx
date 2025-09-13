@@ -63,6 +63,17 @@ export default function ImportExport() {
     }
   };
 
+  const handleExport = () => {
+    const dataStr = JSON.stringify(dbImages, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'search-db-images.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Paper elevation={2} sx={{ p: 4 }}>
       <Typography variant="h5" gutterBottom>
@@ -174,7 +185,9 @@ export default function ImportExport() {
           </Box>
         </>
       )}
-      {/* TODO: Add export functionality here */}
+      <Button variant="outlined" sx={{ mt: 4 }} onClick={handleExport}>
+        Export Search Database
+      </Button>
     </Paper>
   );
 }
