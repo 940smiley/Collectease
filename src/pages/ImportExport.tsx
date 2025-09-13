@@ -67,9 +67,9 @@ const handleExport = () => {
   try {
     const dataStr = JSON.stringify(dbImages, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
     a.href = url;
+    const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = filename;
     a.download = 'search-db-images.json';
     a.click();
     URL.revokeObjectURL(url);
