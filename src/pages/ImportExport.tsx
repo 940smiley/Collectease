@@ -1,21 +1,45 @@
 // Import/Export page: Placeholder
 import { Typography, Paper } from '@mui/material';
-import { useRef, useState } from 'react';
+import { useRef, useState, useMemo, useCallback } from 'react';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { Button, Box, FormControlLabel, Checkbox } from '@mui/material';
 
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
 
-function saveImagesToSearchDB(images: string[]) {
-  // Save images to localStorage for persistence
-  const existing = JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
-  const updated = [...existing, ...images];
-  localStorage.setItem(imageSearchDBKey, JSON.stringify(updated));
+/**
+ * Saves unique images to localStorage to avoid redundant storage and memory bloat.
+ * ⚡ Performance: Uses a Set to ensure O(1) duplicate checking.
+ */
+function saveImagesToSearchDB(newImages: string[]) {
+  try {
+    const existingStr = localStorage.getItem(imageSearchDBKey);
+    const existing: string[] = existingStr ? JSON.parse(existingStr) : [];
+    const existingSet = new Set(existing);
+
+    let changed = false;
+    newImages.forEach(img => {
+      if (!existingSet.has(img)) {
+        existingSet.add(img);
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      localStorage.setItem(imageSearchDBKey, JSON.stringify(Array.from(existingSet)));
+    }
+  } catch (e) {
+    console.error('Failed to save to localStorage', e);
+  }
 }
 
 function getImagesFromSearchDB(): string[] {
-  return JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
+  try {
+    return JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
+  } catch (e) {
+    console.error('Failed to parse images from localStorage', e);
+    return [];
+  }
 }
 
 export default function ImportExport() {
@@ -24,12 +48,14 @@ export default function ImportExport() {
   const [searchable, setSearchable] = useState(false);
   const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
       const newImages: string[] = [];
       let loaded = 0;
-      for (let i = 0; i < files.length; i++) {
+      const fileCount = files.length;
+
+      for (let i = 0; i < fileCount; i++) {
         const file = files[i];
         if (file.type.startsWith('image/')) {
           const reader = new FileReader();
@@ -37,52 +63,102 @@ export default function ImportExport() {
             const imageUrl = e.target?.result as string;
             newImages.push(imageUrl);
             loaded++;
-            if (loaded === files.length) {
+
+            if (loaded === fileCount) {
               setImages((prev) => [...prev, ...newImages]);
               if (searchable) {
-                // Add images to the search database
-                saveImagesToSearchDB([...images, ...newImages]);
+                saveImagesToSearchDB(newImages);
                 setDbImages(getImagesFromSearchDB());
                 alert('Images imported and added to the search database!');
-                console.log('Images in search DB:', getImagesFromSearchDB());
               }
             }
           };
           reader.readAsDataURL(file);
         } else {
-          // For non-image files, just read as text (optional: handle as before)
+          // Non-image files: handle as before
           const reader = new FileReader();
           reader.onload = (e) => {
             const text = e.target?.result;
-            alert('File imported! (See console for contents)');
             console.log('Imported file contents:', text);
+            loaded++;
+            if (loaded === fileCount) {
+              alert('Non-image file(s) imported! (See console)');
+            }
           };
           reader.readAsText(file);
         }
       }
     }
-  };
+  }, [searchable]);
 
-const handleExport = () => {
-  try {
-    const dataStr = JSON.stringify(dbImages, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    a.href = url;
-    const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
-    a.download = filename;
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Failed to export  error);
-    // Assuming you have some form of error notification system
-    // showError('Failed to export data. Please try again.');
-  }
-};
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const handleExport = useCallback(() => {
+    try {
+      const dataStr = JSON.stringify(dbImages, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export', error);
+    }
+  }, [dbImages]);
+
+  // ⚡ Performance: Memoize image lists to prevent re-rendering when 'searchable' or other state changes
+  const renderedImportedImages = useMemo(() => (
+    images.map((img, idx) => (
+      <Box
+        key={`imported-${idx}`}
+        sx={{
+          width: 120,
+          height: 120,
+          borderRadius: 2,
+          overflow: 'hidden',
+          border: '1px solid #ccc',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#fafafa',
+        }}
+      >
+        <img
+          src={img}
+          alt={`imported-${idx}`}
+          style={{ maxWidth: '100%', maxHeight: '100%' }}
+          loading="lazy"
+        />
+      </Box>
+    ))
+  ), [images]);
+
+  const renderedDbImages = useMemo(() => (
+    dbImages.map((img, idx) => (
+      <Box
+        key={`db-${idx}`}
+        sx={{
+          width: 80,
+          height: 80,
+          borderRadius: 2,
+          overflow: 'hidden',
+          border: '1px solid #90caf9',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#e3f2fd',
+        }}
+      >
+        <img
+          src={img}
+          alt={`dbimg-${idx}`}
+          style={{ maxWidth: '100%', maxHeight: '100%' }}
+          loading="lazy"
+        />
+      </Box>
+    ))
+  ), [dbImages]);
 
   return (
     <Paper elevation={2} sx={{ p: 4 }}>
@@ -92,6 +168,7 @@ const handleExport = () => {
       <Typography color="text.secondary" gutterBottom>
         Import your collection or export it to other platforms.
       </Typography>
+
       <FormControlLabel
         control={
           <Checkbox
@@ -103,14 +180,21 @@ const handleExport = () => {
         label="Mark imported images as searchable (for image recognition/search)"
         sx={{ mb: 2 }}
       />
-      <Button
-        variant="contained"
-        startIcon={<UploadFileIcon />}
-        onClick={() => fileInputRef.current?.click()}
-        sx={{ mt: 2 }}
-      >
-        Import Files or Images
-      </Button>
+
+      <Box sx={{ mb: 4 }}>
+        <Button
+          variant="contained"
+          startIcon={<UploadFileIcon />}
+          onClick={() => fileInputRef.current?.click()}
+          sx={{ mr: 2 }}
+        >
+          Import Files or Images
+        </Button>
+        <Button variant="outlined" onClick={handleExport} disabled={dbImages.length === 0}>
+          Export Search Database
+        </Button>
+      </Box>
+
       <input
         type="file"
         accept=".csv,.json,.txt,image/*"
@@ -119,85 +203,28 @@ const handleExport = () => {
         onChange={handleFileChange}
         multiple
       />
+
       {images.length > 0 && (
         <>
           <Typography variant="subtitle1" sx={{ mt: 3 }}>
-            Imported Images:
+            Imported Images ({images.length}):
           </Typography>
-          <Box
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 2,
-              mt: 1,
-            }}
-          >
-            {images.map((img, idx) => (
-              <Box
-                key={idx}
-                sx={{
-                  width: 120,
-                  height: 120,
-                  borderRadius: 2,
-                  overflow: 'hidden',
-                  border: '1px solid #ccc',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: '#fafafa',
-                }}
-              >
-                <img
-                  src={img}
-                  alt={`imported-${idx}`}
-                  style={{ maxWidth: '100%', maxHeight: '100%' }}
-                />
-              </Box>
-            ))}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 1 }}>
+            {renderedImportedImages}
           </Box>
         </>
       )}
+
       {dbImages.length > 0 && (
         <>
           <Typography variant="subtitle1" sx={{ mt: 4 }}>
-            Images in Search Database:
+            Images in Search Database ({dbImages.length}):
           </Typography>
-          <Box
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 2,
-              mt: 1,
-            }}
-          >
-            {dbImages.map((img, idx) => (
-              <Box
-                key={idx}
-                sx={{
-                  width: 80,
-                  height: 80,
-                  borderRadius: 2,
-                  overflow: 'hidden',
-                  border: '1px solid #90caf9',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: '#e3f2fd',
-                }}
-              >
-                <img
-                  src={img}
-                  alt={`dbimg-${idx}`}
-                  style={{ maxWidth: '100%', maxHeight: '100%' }}
-                />
-              </Box>
-            ))}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 1 }}>
+            {renderedDbImages}
           </Box>
         </>
       )}
-      <Button variant="outlined" sx={{ mt: 4 }} onClick={handleExport}>
-        Export Search Database
-      </Button>
     </Paper>
   );
 }

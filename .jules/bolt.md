@@ -1,0 +1,3 @@
+## 2025-02-11 - [Route-based Code Splitting and LocalStorage Optimization]
+**Learning:** Even in a small application, static imports for all pages can lead to a bloated initial bundle. Combining code splitting with memoization of expensive lists (especially those containing images) provides a compounded performance benefit. Additionally, using a `Set` for deduplication before writing large datasets (like base64 images) to `localStorage` is critical to prevent storage quota exhaustion and main-thread blocking during serialization.
+**Action:** Always check `routes.tsx` for static imports of major page components. For features involving bulk data/image handling, always implement deduplication and use `useMemo` for list rendering.

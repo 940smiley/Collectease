@@ -1,11 +1,15 @@
 // App routes for Collectease
+import { lazy } from 'react';
 import type { RouteObject } from 'react-router-dom';
-import Dashboard from './pages/Dashboard';
-import Collection from './pages/Collection';
-import ImportExport from './pages/ImportExport';
-import Share from './pages/Share';
-import Marketplace from './pages/Marketplace';
 import AppLayout from './components/AppLayout';
+
+// ⚡ Performance: Route-based code splitting
+// These components will be loaded only when the user navigates to the respective route.
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Collection = lazy(() => import('./pages/Collection'));
+const ImportExport = lazy(() => import('./pages/ImportExport'));
+const Share = lazy(() => import('./pages/Share'));
+const Marketplace = lazy(() => import('./pages/Marketplace'));
 
 const routes: RouteObject[] = [
   {
