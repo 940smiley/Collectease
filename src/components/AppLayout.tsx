@@ -1,6 +1,6 @@
 // AppLayout: Main layout with MUI AppBar, Drawer, and content area
-import type { ReactNode } from 'react';
-import { AppBar, Toolbar, Typography, Drawer, List, ListItem, ListItemIcon, ListItemText, ListItemButton, Box } from '@mui/material';
+import { type ReactNode, Suspense } from 'react';
+import { AppBar, Toolbar, Typography, Drawer, List, ListItem, ListItemIcon, ListItemText, ListItemButton, Box, CircularProgress } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import CategoryIcon from '@mui/icons-material/Category';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
@@ -55,7 +55,16 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: 3, ml: `${drawerWidth}px` }}>
         <Toolbar />
-        {children || <Outlet />}
+        {/* Suspense handles the loading state for lazy-loaded routes */}
+        <Suspense
+          fallback={
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+              <CircularProgress />
+            </Box>
+          }
+        >
+          {children || <Outlet />}
+        </Suspense>
       </Box>
     </Box>
   );

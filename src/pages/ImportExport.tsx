@@ -22,7 +22,8 @@ export default function ImportExport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
-  const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  // Lazy initialization avoids reading from localStorage on every re-render
+  const [dbImages, setDbImages] = useState<string[]>(() => getImagesFromSearchDB());
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -40,9 +41,11 @@ export default function ImportExport() {
             if (loaded === files.length) {
               setImages((prev) => [...prev, ...newImages]);
               if (searchable) {
-                // Add images to the search database
-                saveImagesToSearchDB([...images, ...newImages]);
-                setDbImages(getImagesFromSearchDB());
+                // Optimize: Save only the NEW images to the database.
+                // saveImagesToSearchDB already appends to existing localStorage data.
+                saveImagesToSearchDB(newImages);
+                // Optimize: Update state functionally to avoid a redundant localStorage read
+                setDbImages((prev) => [...prev, ...newImages]);
                 alert('Images imported and added to the search database!');
                 console.log('Images in search DB:', getImagesFromSearchDB());
               }
@@ -67,22 +70,21 @@ const handleExport = () => {
   try {
     const dataStr = JSON.stringify(dbImages, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
     a.href = url;
     const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
     a.download = filename;
-    a.download = 'search-db-images.json';
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   } catch (error) {
-    console.error('Failed to export  error);
+    console.error('Failed to export', error);
     // Assuming you have some form of error notification system
     // showError('Failed to export data. Please try again.');
   }
 };
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <Paper elevation={2} sx={{ p: 4 }}>
@@ -150,6 +152,7 @@ const handleExport = () => {
                 <img
                   src={img}
                   alt={`imported-${idx}`}
+                  loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
               </Box>
@@ -188,6 +191,7 @@ const handleExport = () => {
                 <img
                   src={img}
                   alt={`dbimg-${idx}`}
+                  loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
               </Box>
