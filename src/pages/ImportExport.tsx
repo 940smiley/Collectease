@@ -22,13 +22,18 @@ export default function ImportExport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
-  const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  // BOLT OPTIMIZATION: Use lazy initialization to avoid expensive localStorage reads on every render
+  const [dbImages, setDbImages] = useState<string[]>(() => getImagesFromSearchDB());
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
       const newImages: string[] = [];
       let loaded = 0;
+      const fileCount = Array.from(files).filter(f => f.type.startsWith('image/')).length;
+
+      if (fileCount === 0) return;
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (file.type.startsWith('image/')) {
@@ -37,14 +42,15 @@ export default function ImportExport() {
             const imageUrl = e.target?.result as string;
             newImages.push(imageUrl);
             loaded++;
-            if (loaded === files.length) {
+            if (loaded === fileCount) {
+              // BOLT OPTIMIZATION: State updater remains pure
               setImages((prev) => [...prev, ...newImages]);
+
               if (searchable) {
-                // Add images to the search database
-                saveImagesToSearchDB([...images, ...newImages]);
-                setDbImages(getImagesFromSearchDB());
+                // Side effects are executed outside the state updater
+                saveImagesToSearchDB(newImages);
+                setDbImages(prevDb => [...prevDb, ...newImages]);
                 alert('Images imported and added to the search database!');
-                console.log('Images in search DB:', getImagesFromSearchDB());
               }
             }
           };
@@ -63,25 +69,23 @@ export default function ImportExport() {
     }
   };
 
-const handleExport = () => {
-  try {
-    const dataStr = JSON.stringify(dbImages, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    a.href = url;
-    const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
-    a.download = filename;
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Failed to export  error);
-    // Assuming you have some form of error notification system
-    // showError('Failed to export data. Please try again.');
-  }
-};
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExport = () => {
+    try {
+      const dataStr = JSON.stringify(dbImages, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      // BOLT OPTIMIZATION: Fix broken function and missing variables
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export', error);
+      // Assuming you have some form of error notification system
+      // showError('Failed to export data. Please try again.');
+    }
   };
 
   return (
@@ -150,6 +154,7 @@ const handleExport = () => {
                 <img
                   src={img}
                   alt={`imported-${idx}`}
+                  loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
               </Box>
@@ -188,6 +193,7 @@ const handleExport = () => {
                 <img
                   src={img}
                   alt={`dbimg-${idx}`}
+                  loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
               </Box>
