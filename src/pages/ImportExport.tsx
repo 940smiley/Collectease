@@ -7,12 +7,6 @@ import { Button, Box, FormControlLabel, Checkbox } from '@mui/material';
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
 
-function saveImagesToSearchDB(images: string[]) {
-  // Save images to localStorage for persistence
-  const existing = JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
-  const updated = [...existing, ...images];
-  localStorage.setItem(imageSearchDBKey, JSON.stringify(updated));
-}
 
 function getImagesFromSearchDB(): string[] {
   return JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
@@ -22,66 +16,81 @@ export default function ImportExport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
-  const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  /**
+   * ⚡ BOLT OPTIMIZATION: Use lazy initialization for state derived from localStorage.
+   * This ensures the expensive JSON.parse(localStorage.getItem(...)) only runs on initial mount,
+   * not on every subsequent re-render.
+   */
+  const [dbImages, setDbImages] = useState<string[]>(() => getImagesFromSearchDB());
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files && files.length > 0) {
-      const newImages: string[] = [];
-      let loaded = 0;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.type.startsWith('image/')) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const imageUrl = e.target?.result as string;
-            newImages.push(imageUrl);
-            loaded++;
-            if (loaded === files.length) {
-              setImages((prev) => [...prev, ...newImages]);
-              if (searchable) {
-                // Add images to the search database
-                saveImagesToSearchDB([...images, ...newImages]);
-                setDbImages(getImagesFromSearchDB());
-                alert('Images imported and added to the search database!');
-                console.log('Images in search DB:', getImagesFromSearchDB());
-              }
-            }
-          };
-          reader.readAsDataURL(file);
-        } else {
-          // For non-image files, just read as text (optional: handle as before)
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const text = e.target?.result;
-            alert('File imported! (See console for contents)');
-            console.log('Imported file contents:', text);
-          };
-          reader.readAsText(file);
+    if (!files || files.length === 0) return;
+
+    const fileList = Array.from(files);
+
+    // Helper to read file as DataURL
+    const readFile = (file: File): Promise<string> =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+    const imageFiles = fileList.filter(f => f.type.startsWith('image/'));
+    const otherFiles = fileList.filter(f => !f.type.startsWith('image/'));
+
+    // Handle non-image files
+    otherFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        alert('File imported! (See console for contents)');
+        console.log('Imported file contents:', e.target?.result);
+      };
+      reader.readAsText(file);
+    });
+
+    try {
+      /**
+       * ⚡ BOLT OPTIMIZATION: Process files in parallel using Promise.all.
+       * This significantly improves performance over sequential processing when importing multiple files.
+       */
+      const newImageUrls = await Promise.all(imageFiles.map(readFile));
+
+      if (newImageUrls.length > 0) {
+        setImages((prev) => [...prev, ...newImageUrls]);
+        if (searchable) {
+          /**
+           * ⚡ BOLT OPTIMIZATION: Update state and persistence in a single pass.
+           * By using the current state instead of re-reading from localStorage,
+           * we eliminate redundant synchronous I/O operations that block the main thread.
+           */
+          const updatedDb = [...dbImages, ...newImageUrls];
+          setDbImages(updatedDb);
+          localStorage.setItem(imageSearchDBKey, JSON.stringify(updatedDb));
+          alert('Images imported and added to the search database!');
         }
       }
+    } catch (error) {
+      console.error('Error reading image files:', error);
     }
   };
 
-const handleExport = () => {
-  try {
-    const dataStr = JSON.stringify(dbImages, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    a.href = url;
-    const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
-    a.download = filename;
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Failed to export  error);
-    // Assuming you have some form of error notification system
-    // showError('Failed to export data. Please try again.');
-  }
-};
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExport = () => {
+    try {
+      const dataStr = JSON.stringify(dbImages, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export', error);
+    }
   };
 
   return (
@@ -151,6 +160,7 @@ const handleExport = () => {
                   src={img}
                   alt={`imported-${idx}`}
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
+                  loading="lazy"
                 />
               </Box>
             ))}
@@ -189,6 +199,7 @@ const handleExport = () => {
                   src={img}
                   alt={`dbimg-${idx}`}
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
+                  loading="lazy"
                 />
               </Box>
             ))}
