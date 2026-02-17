@@ -1,8 +1,7 @@
 // Import/Export page: Placeholder
-import { Typography, Paper } from '@mui/material';
+import { Typography, Paper, Snackbar, Alert, Button, Box, FormControlLabel, Checkbox } from '@mui/material';
 import { useRef, useState } from 'react';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { Button, Box, FormControlLabel, Checkbox } from '@mui/material';
 
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
@@ -23,6 +22,11 @@ export default function ImportExport() {
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
   const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  const [sb, setSb] = useState<{ open: boolean; msg: string; sev: 'success' | 'error' | 'info' }>({
+    open: false,
+    msg: '',
+    sev: 'info',
+  });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -43,8 +47,11 @@ export default function ImportExport() {
                 // Add images to the search database
                 saveImagesToSearchDB([...images, ...newImages]);
                 setDbImages(getImagesFromSearchDB());
-                alert('Images imported and added to the search database!');
-                console.log('Images in search DB:', getImagesFromSearchDB());
+                setSb({
+                  open: true,
+                  msg: 'Images imported and added to the search database!',
+                  sev: 'success',
+                });
               }
             }
           };
@@ -53,9 +60,8 @@ export default function ImportExport() {
           // For non-image files, just read as text (optional: handle as before)
           const reader = new FileReader();
           reader.onload = (e) => {
-            const text = e.target?.result;
-            alert('File imported! (See console for contents)');
-            console.log('Imported file contents:', text);
+            setSb({ open: true, msg: 'File imported! (See console for contents)', sev: 'info' });
+            console.log('Imported file contents:', e.target?.result);
           };
           reader.readAsText(file);
         }
@@ -63,25 +69,20 @@ export default function ImportExport() {
     }
   };
 
-const handleExport = () => {
-  try {
-    const dataStr = JSON.stringify(dbImages, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    a.href = url;
-    const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
-    a.download = filename;
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Failed to export  error);
-    // Assuming you have some form of error notification system
-    // showError('Failed to export data. Please try again.');
-  }
-};
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExport = () => {
+    try {
+      const blob = new Blob([JSON.stringify(dbImages, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `search-db-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setSb({ open: true, msg: 'Export failed', sev: 'error' });
+    }
   };
 
   return (
@@ -198,6 +199,15 @@ const handleExport = () => {
       <Button variant="outlined" sx={{ mt: 4 }} onClick={handleExport}>
         Export Search Database
       </Button>
+      <Snackbar
+        open={sb.open}
+        autoHideDuration={3000}
+        onClose={() => setSb((prev) => ({ ...prev, open: false }))}
+      >
+        <Alert severity={sb.sev} sx={{ width: '100%' }}>
+          {sb.msg}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 }
