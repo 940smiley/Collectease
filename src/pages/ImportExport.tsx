@@ -7,12 +7,6 @@ import { Button, Box, FormControlLabel, Checkbox } from '@mui/material';
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
 
-function saveImagesToSearchDB(images: string[]) {
-  // Save images to localStorage for persistence
-  const existing = JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
-  const updated = [...existing, ...images];
-  localStorage.setItem(imageSearchDBKey, JSON.stringify(updated));
-}
 
 function getImagesFromSearchDB(): string[] {
   return JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
@@ -22,66 +16,62 @@ export default function ImportExport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
-  const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  const [dbImages, setDbImages] = useState<string[]>(() => getImagesFromSearchDB());
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
-      const newImages: string[] = [];
-      let loaded = 0;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.type.startsWith('image/')) {
+      const fileArray = Array.from(files);
+
+      // Process images in parallel
+      const imagePromises = fileArray
+        .filter(file => file.type.startsWith('image/'))
+        .map(file => new Promise<string>((resolve) => {
           const reader = new FileReader();
-          reader.onload = (e) => {
-            const imageUrl = e.target?.result as string;
-            newImages.push(imageUrl);
-            loaded++;
-            if (loaded === files.length) {
-              setImages((prev) => [...prev, ...newImages]);
-              if (searchable) {
-                // Add images to the search database
-                saveImagesToSearchDB([...images, ...newImages]);
-                setDbImages(getImagesFromSearchDB());
-                alert('Images imported and added to the search database!');
-                console.log('Images in search DB:', getImagesFromSearchDB());
-              }
-            }
-          };
+          reader.onload = (e) => resolve(e.target?.result as string);
           reader.readAsDataURL(file);
-        } else {
-          // For non-image files, just read as text (optional: handle as before)
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const text = e.target?.result;
-            alert('File imported! (See console for contents)');
-            console.log('Imported file contents:', text);
-          };
-          reader.readAsText(file);
+        }));
+
+      const newImages = await Promise.all(imagePromises);
+
+      if (newImages.length > 0) {
+        setImages((prev) => [...prev, ...newImages]);
+        if (searchable) {
+          // Optimized: Batch LocalStorage and state updates
+          const existing = getImagesFromSearchDB();
+          const updated = [...existing, ...newImages];
+          localStorage.setItem(imageSearchDBKey, JSON.stringify(updated));
+          setDbImages(updated);
+          alert('Images imported and added to the search database!');
         }
+      }
+
+      // Handle non-image files
+      const otherFiles = fileArray.filter(file => !file.type.startsWith('image/'));
+      for (const file of otherFiles) {
+        const text = await file.text();
+        console.log('Imported file contents:', text);
+        alert('File imported! (See console for contents)');
       }
     }
   };
 
-const handleExport = () => {
-  try {
-    const dataStr = JSON.stringify(dbImages, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    a.href = url;
-    const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
-    a.download = filename;
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Failed to export  error);
-    // Assuming you have some form of error notification system
-    // showError('Failed to export data. Please try again.');
-  }
-};
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExport = () => {
+    try {
+      const dataStr = JSON.stringify(dbImages, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export:', error);
+    }
   };
 
   return (
@@ -150,6 +140,7 @@ const handleExport = () => {
                 <img
                   src={img}
                   alt={`imported-${idx}`}
+                  loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
               </Box>
@@ -188,6 +179,7 @@ const handleExport = () => {
                 <img
                   src={img}
                   alt={`dbimg-${idx}`}
+                  loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
               </Box>
