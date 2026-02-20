@@ -15,21 +15,28 @@ function saveImagesToSearchDB(images: string[]) {
 }
 
 function getImagesFromSearchDB(): string[] {
-  return JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
+  try {
+    return JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
+  } catch {
+    return [];
+  }
 }
 
 export default function ImportExport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
-  const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  // Optimization: Lazy initialization for state that reads from localStorage
+  const [dbImages, setDbImages] = useState<string[]>(() => getImagesFromSearchDB());
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
       const newImages: string[] = [];
       let loaded = 0;
-      for (let i = 0; i < files.length; i++) {
+      const totalFiles = files.length;
+
+      for (let i = 0; i < totalFiles; i++) {
         const file = files[i];
         if (file.type.startsWith('image/')) {
           const reader = new FileReader();
@@ -37,25 +44,27 @@ export default function ImportExport() {
             const imageUrl = e.target?.result as string;
             newImages.push(imageUrl);
             loaded++;
-            if (loaded === files.length) {
+            if (loaded === totalFiles) {
               setImages((prev) => [...prev, ...newImages]);
               if (searchable) {
                 // Add images to the search database
-                saveImagesToSearchDB([...images, ...newImages]);
+                saveImagesToSearchDB(newImages);
                 setDbImages(getImagesFromSearchDB());
                 alert('Images imported and added to the search database!');
-                console.log('Images in search DB:', getImagesFromSearchDB());
               }
             }
           };
           reader.readAsDataURL(file);
         } else {
-          // For non-image files, just read as text (optional: handle as before)
+          // For non-image files, just read as text
           const reader = new FileReader();
           reader.onload = (e) => {
             const text = e.target?.result;
-            alert('File imported! (See console for contents)');
             console.log('Imported file contents:', text);
+            loaded++;
+            if (loaded === totalFiles) {
+               setImages((prev) => [...prev, ...newImages]);
+            }
           };
           reader.readAsText(file);
         }
@@ -63,25 +72,20 @@ export default function ImportExport() {
     }
   };
 
-const handleExport = () => {
-  try {
-    const dataStr = JSON.stringify(dbImages, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    a.href = url;
-    const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
-    a.download = filename;
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Failed to export  error);
-    // Assuming you have some form of error notification system
-    // showError('Failed to export data. Please try again.');
-  }
-};
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExport = () => {
+    try {
+      const dataStr = JSON.stringify(dbImages, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export', error);
+    }
   };
 
   return (
@@ -151,6 +155,7 @@ const handleExport = () => {
                   src={img}
                   alt={`imported-${idx}`}
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
+                  loading="lazy"
                 />
               </Box>
             ))}
@@ -189,13 +194,14 @@ const handleExport = () => {
                   src={img}
                   alt={`dbimg-${idx}`}
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
+                  loading="lazy"
                 />
               </Box>
             ))}
           </Box>
         </>
       )}
-      <Button variant="outlined" sx={{ mt: 4 }} onClick={handleExport}>
+      <Button variant="outlined" sx={{ mt: 4 }} onClick={handleExport} disabled={dbImages.length === 0}>
         Export Search Database
       </Button>
     </Paper>
