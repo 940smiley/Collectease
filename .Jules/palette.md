@@ -1,0 +1,3 @@
+## 2025-05-14 - Enhancing Asynchronous Feedback in Import/Export
+**Learning:** Replacing synchronous browser `alert()` calls with non-intrusive `Snackbar` and `Alert` components significantly improves the perceived smoothness of the application. Additionally, providing immediate visual feedback via a `loading` state (e.g., `CircularProgress` inside the action button) during file processing prevents duplicate interactions and keeps the user informed of the application's progress.
+**Action:** Always prefer `Snackbar` for non-critical notifications and use `CircularProgress` (or similar) within buttons to indicate background activity.
