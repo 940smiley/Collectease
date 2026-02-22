@@ -1,8 +1,7 @@
 // Import/Export page: Placeholder
-import { Typography, Paper } from '@mui/material';
+import { Typography, Paper, Button, Box, FormControlLabel, Checkbox, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { useRef, useState } from 'react';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { Button, Box, FormControlLabel, Checkbox } from '@mui/material';
 
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
@@ -22,66 +21,89 @@ export default function ImportExport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({ open: false, message: '', severity: 'success' });
   const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files && files.length > 0) {
-      const newImages: string[] = [];
-      let loaded = 0;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+    if (!files || files.length === 0) return;
+
+    setIsImporting(true);
+    const newImages: string[] = [];
+
+    const filePromises = Array.from(files).map((file) => {
+      return new Promise<void>((resolve) => {
+        const reader = new FileReader();
         if (file.type.startsWith('image/')) {
-          const reader = new FileReader();
           reader.onload = (e) => {
             const imageUrl = e.target?.result as string;
             newImages.push(imageUrl);
-            loaded++;
-            if (loaded === files.length) {
-              setImages((prev) => [...prev, ...newImages]);
-              if (searchable) {
-                // Add images to the search database
-                saveImagesToSearchDB([...images, ...newImages]);
-                setDbImages(getImagesFromSearchDB());
-                alert('Images imported and added to the search database!');
-                console.log('Images in search DB:', getImagesFromSearchDB());
-              }
-            }
+            resolve();
           };
+          reader.onerror = () => resolve();
           reader.readAsDataURL(file);
         } else {
-          // For non-image files, just read as text (optional: handle as before)
-          const reader = new FileReader();
           reader.onload = (e) => {
-            const text = e.target?.result;
-            alert('File imported! (See console for contents)');
-            console.log('Imported file contents:', text);
+            console.log('Imported file contents:', e.target?.result);
+            resolve();
           };
+          reader.onerror = () => resolve();
           reader.readAsText(file);
         }
-      }
+      });
+    });
+
+    await Promise.all(filePromises);
+    setImages((prev) => [...prev, ...newImages]);
+
+    const imageCount = newImages.length;
+    const otherCount = files.length - imageCount;
+
+    if (searchable && imageCount > 0) {
+      saveImagesToSearchDB(newImages);
+      setDbImages(getImagesFromSearchDB());
     }
+
+    let message = '';
+    if (imageCount > 0 && otherCount > 0) {
+      message = `Imported ${imageCount} images and ${otherCount} files.`;
+    } else if (imageCount > 0) {
+      message = `Imported ${imageCount} image${imageCount > 1 ? 's' : ''} successfully!`;
+    } else if (otherCount > 0) {
+      message = `Imported ${otherCount} file${otherCount > 1 ? 's' : ''} successfully!`;
+    }
+
+    if (message) {
+      setSnackbar({ open: true, message, severity: 'success' });
+    }
+
+    setIsImporting(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-const handleExport = () => {
-  try {
-    const dataStr = JSON.stringify(dbImages, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    a.href = url;
-    const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
-    a.download = filename;
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Failed to export  error);
-    // Assuming you have some form of error notification system
-    // showError('Failed to export data. Please try again.');
-  }
-};
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExport = () => {
+    try {
+      if (dbImages.length === 0) return;
+      const dataStr = JSON.stringify(dbImages, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setSnackbar({ open: true, message: 'Database exported successfully!', severity: 'success' });
+    } catch (error) {
+      console.error('Failed to export:', error);
+      setSnackbar({ open: true, message: 'Failed to export data. Please try again.', severity: 'error' });
+    }
   };
 
   return (
@@ -105,11 +127,12 @@ const handleExport = () => {
       />
       <Button
         variant="contained"
-        startIcon={<UploadFileIcon />}
+        startIcon={isImporting ? <CircularProgress size={20} color="inherit" /> : <UploadFileIcon />}
         onClick={() => fileInputRef.current?.click()}
+        disabled={isImporting}
         sx={{ mt: 2 }}
       >
-        Import Files or Images
+        {isImporting ? 'Importing...' : 'Import Files or Images'}
       </Button>
       <input
         type="file"
@@ -150,6 +173,7 @@ const handleExport = () => {
                 <img
                   src={img}
                   alt={`imported-${idx}`}
+                  loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
               </Box>
@@ -188,6 +212,7 @@ const handleExport = () => {
                 <img
                   src={img}
                   alt={`dbimg-${idx}`}
+                  loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
               </Box>
@@ -195,9 +220,29 @@ const handleExport = () => {
           </Box>
         </>
       )}
-      <Button variant="outlined" sx={{ mt: 4 }} onClick={handleExport}>
+      <Button
+        variant="outlined"
+        sx={{ mt: 4 }}
+        onClick={handleExport}
+        disabled={dbImages.length === 0}
+      >
         Export Search Database
       </Button>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 }
