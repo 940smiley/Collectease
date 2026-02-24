@@ -22,7 +22,7 @@ export default function ImportExport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
-  const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  const [dbImages, setDbImages] = useState<string[]>(() => getImagesFromSearchDB());
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -40,8 +40,8 @@ export default function ImportExport() {
             if (loaded === files.length) {
               setImages((prev) => [...prev, ...newImages]);
               if (searchable) {
-                // Add images to the search database
-                saveImagesToSearchDB([...images, ...newImages]);
+                // Add images to the search database (append operation)
+                saveImagesToSearchDB(newImages);
                 setDbImages(getImagesFromSearchDB());
                 alert('Images imported and added to the search database!');
                 console.log('Images in search DB:', getImagesFromSearchDB());
@@ -61,27 +61,26 @@ export default function ImportExport() {
         }
       }
     }
+    // Reset input to allow re-selecting the same file
+    if (event.target) {
+      event.target.value = '';
+    }
   };
 
-const handleExport = () => {
-  try {
-    const dataStr = JSON.stringify(dbImages, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    a.href = url;
-    const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
-    a.download = filename;
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Failed to export  error);
-    // Assuming you have some form of error notification system
-    // showError('Failed to export data. Please try again.');
-  }
-};
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExport = () => {
+    try {
+      const dataStr = JSON.stringify(dbImages, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export', error);
+    }
   };
 
   return (
@@ -151,6 +150,7 @@ const handleExport = () => {
                   src={img}
                   alt={`imported-${idx}`}
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
+                  loading="lazy"
                 />
               </Box>
             ))}
@@ -189,6 +189,7 @@ const handleExport = () => {
                   src={img}
                   alt={`dbimg-${idx}`}
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
+                  loading="lazy"
                 />
               </Box>
             ))}
