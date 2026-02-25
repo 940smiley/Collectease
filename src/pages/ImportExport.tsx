@@ -1,7 +1,8 @@
 // Import/Export page: Placeholder
-import { Typography, Paper } from '@mui/material';
+import { Typography, Paper, Snackbar, Alert, Tooltip } from '@mui/material';
 import { useRef, useState } from 'react';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import DownloadIcon from '@mui/icons-material/Download';
 import { Button, Box, FormControlLabel, Checkbox } from '@mui/material';
 
 // Simulated image search database (in-memory for now)
@@ -23,6 +24,19 @@ export default function ImportExport() {
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
   const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'info',
+  });
+
+  const handleSnackbarClose = () => {
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -43,7 +57,11 @@ export default function ImportExport() {
                 // Add images to the search database
                 saveImagesToSearchDB([...images, ...newImages]);
                 setDbImages(getImagesFromSearchDB());
-                alert('Images imported and added to the search database!');
+                setSnackbar({
+                  open: true,
+                  message: 'Images imported and added to the search database!',
+                  severity: 'success',
+                });
                 console.log('Images in search DB:', getImagesFromSearchDB());
               }
             }
@@ -54,7 +72,11 @@ export default function ImportExport() {
           const reader = new FileReader();
           reader.onload = (e) => {
             const text = e.target?.result;
-            alert('File imported! (See console for contents)');
+            setSnackbar({
+              open: true,
+              message: 'File imported! (See console for contents)',
+              severity: 'info',
+            });
             console.log('Imported file contents:', text);
           };
           reader.readAsText(file);
@@ -63,25 +85,22 @@ export default function ImportExport() {
     }
   };
 
-const handleExport = () => {
-  try {
-    const dataStr = JSON.stringify(dbImages, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    a.href = url;
-    const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
-    a.download = filename;
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Failed to export  error);
-    // Assuming you have some form of error notification system
-    // showError('Failed to export data. Please try again.');
-  }
-};
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExport = () => {
+    try {
+      const dataStr = JSON.stringify(dbImages, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export', error);
+      // Assuming you have some form of error notification system
+      // showError('Failed to export data. Please try again.');
+    }
   };
 
   return (
@@ -103,14 +122,16 @@ const handleExport = () => {
         label="Mark imported images as searchable (for image recognition/search)"
         sx={{ mb: 2 }}
       />
-      <Button
-        variant="contained"
-        startIcon={<UploadFileIcon />}
-        onClick={() => fileInputRef.current?.click()}
-        sx={{ mt: 2 }}
-      >
-        Import Files or Images
-      </Button>
+      <Tooltip title="Select files or images to import into your collection">
+        <Button
+          variant="contained"
+          startIcon={<UploadFileIcon />}
+          onClick={() => fileInputRef.current?.click()}
+          sx={{ mt: 2 }}
+        >
+          Import Files or Images
+        </Button>
+      </Tooltip>
       <input
         type="file"
         accept=".csv,.json,.txt,image/*"
@@ -118,6 +139,7 @@ const handleExport = () => {
         style={{ display: 'none' }}
         onChange={handleFileChange}
         multiple
+        aria-label="Upload files or images"
       />
       {images.length > 0 && (
         <>
@@ -149,7 +171,7 @@ const handleExport = () => {
               >
                 <img
                   src={img}
-                  alt={`imported-${idx}`}
+                  alt={`Imported collection item ${idx + 1}`}
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
               </Box>
@@ -187,7 +209,7 @@ const handleExport = () => {
               >
                 <img
                   src={img}
-                  alt={`dbimg-${idx}`}
+                  alt={`Collection item ${idx + 1} from search database`}
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
               </Box>
@@ -195,9 +217,26 @@ const handleExport = () => {
           </Box>
         </>
       )}
-      <Button variant="outlined" sx={{ mt: 4 }} onClick={handleExport}>
-        Export Search Database
-      </Button>
+      <Tooltip title="Download your search database as a JSON file">
+        <Button
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          sx={{ mt: 4 }}
+          onClick={handleExport}
+        >
+          Export Search Database
+        </Button>
+      </Tooltip>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 }
