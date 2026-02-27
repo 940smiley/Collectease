@@ -1,0 +1,3 @@
+## 2026-02-27 - Lazy State Initialization and Code Splitting
+**Learning:** Initializing state from localStorage synchronously on every render is a common performance bottleneck in React apps. Using the lazy initializer pattern (`useState(() => getImagesFromSearchDB())`) ensures the expensive I/O operation only runs once. Additionally, route-based code splitting isolated the larger `ImportExport` logic from the main bundle, reducing the initial load size by ~20kB.
+**Action:** Always use lazy initializers for state derived from `localStorage` or other expensive sources. Implement `React.lazy` for routes to keep the entry bundle lean.
