@@ -1,8 +1,10 @@
 // Import/Export page: Placeholder
-import { Typography, Paper } from '@mui/material';
+import {
+  Typography, Paper, Snackbar, Alert, CircularProgress,
+  Button, Box, FormControlLabel, Checkbox
+} from '@mui/material';
 import { useRef, useState } from 'react';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { Button, Box, FormControlLabel, Checkbox } from '@mui/material';
 
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
@@ -23,65 +25,106 @@ export default function ImportExport() {
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
   const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info';
+  }>({
+    open: false,
+    message: '',
+    severity: 'info',
+  });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
-      const newImages: string[] = [];
-      let loaded = 0;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.type.startsWith('image/')) {
+      setLoading(true);
+      const fileArray = Array.from(files);
+      const promises = fileArray.map((file) => {
+        return new Promise<string | null>((resolve) => {
           const reader = new FileReader();
-          reader.onload = (e) => {
-            const imageUrl = e.target?.result as string;
-            newImages.push(imageUrl);
-            loaded++;
-            if (loaded === files.length) {
-              setImages((prev) => [...prev, ...newImages]);
-              if (searchable) {
-                // Add images to the search database
-                saveImagesToSearchDB([...images, ...newImages]);
-                setDbImages(getImagesFromSearchDB());
-                alert('Images imported and added to the search database!');
-                console.log('Images in search DB:', getImagesFromSearchDB());
-              }
-            }
-          };
-          reader.readAsDataURL(file);
+          if (file.type.startsWith('image/')) {
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(file);
+          } else {
+            reader.onload = () => resolve(null); // Non-image files don't contribute to 'images' state
+            reader.onerror = () => resolve(null);
+            reader.readAsText(file);
+          }
+        });
+      });
+
+      Promise.all(promises).then((results) => {
+        const newImages = results.filter((result): result is string => result !== null);
+
+        if (newImages.length > 0) {
+          setImages((prev) => [...prev, ...newImages]);
+          if (searchable) {
+            saveImagesToSearchDB(newImages);
+            setDbImages(getImagesFromSearchDB());
+            setSnackbar({
+              open: true,
+              message: `${newImages.length} image(s) imported and added to search database!`,
+              severity: 'success',
+            });
+          } else {
+            setSnackbar({
+              open: true,
+              message: `${newImages.length} image(s) imported!`,
+              severity: 'success',
+            });
+          }
         } else {
-          // For non-image files, just read as text (optional: handle as before)
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const text = e.target?.result;
-            alert('File imported! (See console for contents)');
-            console.log('Imported file contents:', text);
-          };
-          reader.readAsText(file);
+          setSnackbar({
+            open: true,
+            message: 'No images were found in the selected files.',
+            severity: 'info',
+          });
         }
-      }
+
+        setLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }).catch((error) => {
+        console.error('Error processing files:', error);
+        setLoading(false);
+        setSnackbar({
+          open: true,
+          message: 'Error processing files. Please try again.',
+          severity: 'error',
+        });
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      });
     }
   };
 
-const handleExport = () => {
-  try {
-    const dataStr = JSON.stringify(dbImages, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    a.href = url;
-    const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
-    a.download = filename;
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Failed to export  error);
-    // Assuming you have some form of error notification system
-    // showError('Failed to export data. Please try again.');
-  }
-};
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExport = () => {
+    try {
+      const dataStr = JSON.stringify(dbImages, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setSnackbar({
+        open: true,
+        message: 'Search database exported successfully!',
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to export', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to export database.',
+        severity: 'error',
+      });
+    }
   };
 
   return (
@@ -105,11 +148,12 @@ const handleExport = () => {
       />
       <Button
         variant="contained"
-        startIcon={<UploadFileIcon />}
+        startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <UploadFileIcon />}
         onClick={() => fileInputRef.current?.click()}
         sx={{ mt: 2 }}
+        disabled={loading}
       >
-        Import Files or Images
+        {loading ? 'Processing...' : 'Import Files or Images'}
       </Button>
       <input
         type="file"
@@ -195,9 +239,29 @@ const handleExport = () => {
           </Box>
         </>
       )}
-      <Button variant="outlined" sx={{ mt: 4 }} onClick={handleExport}>
+      <Button
+        variant="outlined"
+        sx={{ mt: 4 }}
+        onClick={handleExport}
+        disabled={dbImages.length === 0}
+      >
         Export Search Database
       </Button>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 }
