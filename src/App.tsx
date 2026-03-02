@@ -1,5 +1,6 @@
-import { CssBaseline, ThemeProvider } from '@mui/material';
+import { Box, CircularProgress, CssBaseline, ThemeProvider } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
+import { Suspense } from 'react';
 import { useRoutes } from 'react-router-dom';
 
 import routes from './routes';
@@ -19,7 +20,22 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      {routing}
+      <Suspense
+        fallback={
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              height: '100vh',
+            }}
+          >
+            <CircularProgress />
+          </Box>
+        }
+      >
+        {routing}
+      </Suspense>
     </ThemeProvider>
   );
 }
