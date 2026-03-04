@@ -1,8 +1,7 @@
 // Import/Export page: Placeholder
-import { Typography, Paper } from '@mui/material';
+import { Typography, Paper, Snackbar, Alert, Tooltip, type AlertColor, Button, Box, FormControlLabel, Checkbox } from '@mui/material';
 import { useRef, useState } from 'react';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { Button, Box, FormControlLabel, Checkbox } from '@mui/material';
 
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
@@ -23,6 +22,15 @@ export default function ImportExport() {
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
   const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: AlertColor }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+
+  const showNotification = (message: string, severity: AlertColor = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -43,7 +51,7 @@ export default function ImportExport() {
                 // Add images to the search database
                 saveImagesToSearchDB([...images, ...newImages]);
                 setDbImages(getImagesFromSearchDB());
-                alert('Images imported and added to the search database!');
+                showNotification('Images imported and added to the search database!');
                 console.log('Images in search DB:', getImagesFromSearchDB());
               }
             }
@@ -54,7 +62,7 @@ export default function ImportExport() {
           const reader = new FileReader();
           reader.onload = (e) => {
             const text = e.target?.result;
-            alert('File imported! (See console for contents)');
+            showNotification('File imported! (See console for contents)', 'info');
             console.log('Imported file contents:', text);
           };
           reader.readAsText(file);
@@ -63,25 +71,23 @@ export default function ImportExport() {
     }
   };
 
-const handleExport = () => {
-  try {
-    const dataStr = JSON.stringify(dbImages, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    a.href = url;
-    const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
-    a.download = filename;
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Failed to export  error);
-    // Assuming you have some form of error notification system
-    // showError('Failed to export data. Please try again.');
-  }
-};
-    a.download = 'search-db-images.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExport = () => {
+    try {
+      const dataStr = JSON.stringify(dbImages, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export:', error);
+      showNotification('Failed to export data. Please try again.', 'error');
+    }
   };
 
   return (
@@ -118,6 +124,7 @@ const handleExport = () => {
         style={{ display: 'none' }}
         onChange={handleFileChange}
         multiple
+        aria-label="Upload files or images"
       />
       {images.length > 0 && (
         <>
@@ -195,9 +202,34 @@ const handleExport = () => {
           </Box>
         </>
       )}
-      <Button variant="outlined" sx={{ mt: 4 }} onClick={handleExport}>
-        Export Search Database
-      </Button>
+      <Tooltip title={dbImages.length === 0 ? "No images in database to export" : "Download the image database as JSON"}>
+        <span>
+          <Button
+            variant="outlined"
+            sx={{ mt: 4 }}
+            onClick={handleExport}
+            disabled={dbImages.length === 0}
+          >
+            Export Search Database
+          </Button>
+        </span>
+      </Tooltip>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 }
