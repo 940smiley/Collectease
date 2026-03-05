@@ -108,10 +108,11 @@ export default function ImportExport() {
   }, [dbImages]);
 
   // ⚡ Performance: Memoize image lists to prevent re-rendering when 'searchable' or other state changes
+  // ⚡ Performance: Memoize image lists to prevent re-rendering when 'searchable' or other state changes
   const renderedImportedImages = useMemo(() => (
-    images.map((img, idx) => (
+    images.map((img) => (
       <Box
-        key={`imported-${idx}`}
+        key={img.substring(0, 50)}
         sx={{
           width: 120,
           height: 120,
@@ -126,7 +127,7 @@ export default function ImportExport() {
       >
         <img
           src={img}
-          alt={`imported-${idx}`}
+          alt="imported"
           style={{ maxWidth: '100%', maxHeight: '100%' }}
           loading="lazy"
         />
