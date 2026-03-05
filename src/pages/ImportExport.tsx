@@ -45,7 +45,20 @@ export default function ImportExport() {
             if (loaded === files.length) {
               setImages((prev) => [...prev, ...newImages]);
               if (searchable) {
-                // Add images to the search database
+if (loaded === files.length) {
+  setImages((prev) => {
+    const updatedImages = [...prev, ...newImages];
+    if (searchable) {
+      // Add the updated list to the search database
+      saveImagesToSearchDB(updatedImages);
+      setDbImages(getImagesFromSearchDB());
+      showMessage('Images imported and added to the search database!');
+    } else {
+      showMessage(`${newImages.length} images imported successfully!`);
+    }
+    return updatedImages;
+  });
+}
                 saveImagesToSearchDB([...images, ...newImages]);
                 setDbImages(getImagesFromSearchDB());
                 showMessage('Images imported and added to the search database!');
