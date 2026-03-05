@@ -22,63 +22,64 @@ export default function ImportExport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
-  const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  // Bolt Optimization: Use lazy initializer to avoid reading from localStorage on every render
+  const [dbImages, setDbImages] = useState<string[]>(() => getImagesFromSearchDB());
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
   const showMessage = (message: string, severity: 'success' | 'error' = 'success') => {
     setSnackbar({ open: true, message, severity });
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Bolt Optimization: Refactored handleFileChange to use Promise.all and single state updates
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files && files.length > 0) {
-      const newImages: string[] = [];
-      let loaded = 0;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.type.startsWith('image/')) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const imageUrl = e.target?.result as string;
-            newImages.push(imageUrl);
-            loaded++;
-            if (loaded === files.length) {
-              setImages((prev) => [...prev, ...newImages]);
-              if (searchable) {
-if (loaded === files.length) {
-  setImages((prev) => {
-    const updatedImages = [...prev, ...newImages];
-    if (searchable) {
-      // Add the updated list to the search database
-      saveImagesToSearchDB(updatedImages);
-      setDbImages(getImagesFromSearchDB());
-      showMessage('Images imported and added to the search database!');
-    } else {
-      showMessage(`${newImages.length} images imported successfully!`);
-    }
-    return updatedImages;
-  });
-}
-                saveImagesToSearchDB([...images, ...newImages]);
-                setDbImages(getImagesFromSearchDB());
-                showMessage('Images imported and added to the search database!');
-              } else {
-                showMessage(`${newImages.length} images imported successfully!`);
-              }
-            }
-          };
-          reader.readAsDataURL(file);
+    if (!files || files.length === 0) return;
+
+    const fileList = Array.from(files);
+    const imageFiles = fileList.filter(f => f.type.startsWith('image/'));
+    const nonImageFiles = fileList.filter(f => !f.type.startsWith('image/'));
+
+    // Handle non-image files
+    nonImageFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result;
+        showMessage(`File ${file.name} imported successfully!`);
+        console.log('Imported file contents:', text);
+      };
+      reader.readAsText(file);
+    });
+
+    if (imageFiles.length > 0) {
+      try {
+        const newlyReadImages = await Promise.all(
+          imageFiles.map(file => new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+            reader.readAsDataURL(file);
+          }))
+        );
+
+        setImages(prev => [...prev, ...newlyReadImages]);
+
+        if (searchable) {
+          // Optimization: Only save NEW images to DB to avoid duplicates and redundant operations
+          saveImagesToSearchDB(newlyReadImages);
+          setDbImages(prev => [...prev, ...newlyReadImages]);
+          showMessage(`${newlyReadImages.length} images added to search database!`);
         } else {
-          // For non-image files, just read as text
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const text = e.target?.result;
-            showMessage('File imported successfully!');
-            console.log('Imported file contents:', text);
-          };
-          reader.readAsText(file);
+          showMessage(`${newlyReadImages.length} images imported successfully!`);
         }
+      } catch (error) {
+        console.error('Import error:', error);
+        showMessage('Error importing some images', 'error');
       }
+    }
+
+    // Reset file input to allow re-selecting the same files
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -171,6 +172,7 @@ if (loaded === files.length) {
                   src={img}
                   alt={`Imported item ${idx + 1}`}
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
+                  loading="lazy"
                 />
               </Box>
             ))}
@@ -209,6 +211,7 @@ if (loaded === files.length) {
                   src={img}
                   alt={`Database item ${idx + 1}`}
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
+                  loading="lazy"
                 />
               </Box>
             ))}
