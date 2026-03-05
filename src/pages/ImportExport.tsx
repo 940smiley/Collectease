@@ -2,7 +2,7 @@
 import { Typography, Paper } from '@mui/material';
 import { useRef, useState, useMemo, useCallback } from 'react';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { Button, Box, FormControlLabel, Checkbox } from '@mui/material';
+import { Button, Box, FormControlLabel, Checkbox, Snackbar, Alert, Tooltip } from '@mui/material';
 
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
@@ -47,6 +47,11 @@ export default function ImportExport() {
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
   const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+
+  const showMessage = useCallback((message: string, severity: 'success' | 'error' = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  }, []);
 
   const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -65,31 +70,36 @@ export default function ImportExport() {
             loaded++;
 
             if (loaded === fileCount) {
-              setImages((prev) => [...prev, ...newImages]);
-              if (searchable) {
-                saveImagesToSearchDB(newImages);
-                setDbImages(getImagesFromSearchDB());
-                alert('Images imported and added to the search database!');
-              }
+              setImages((prev) => {
+                const updatedImages = [...prev, ...newImages];
+                if (searchable) {
+                  saveImagesToSearchDB(newImages);
+                  setDbImages(getImagesFromSearchDB());
+                  showMessage('Images imported and added to the search database!');
+                } else {
+                  showMessage(`${newImages.length} images imported successfully!`);
+                }
+                return updatedImages;
+              });
             }
           };
           reader.readAsDataURL(file);
         } else {
-          // Non-image files: handle as before
+          // For non-image files, just read as text
           const reader = new FileReader();
           reader.onload = (e) => {
             const text = e.target?.result;
             console.log('Imported file contents:', text);
             loaded++;
             if (loaded === fileCount) {
-              alert('Non-image file(s) imported! (See console)');
+              showMessage('File(s) imported successfully!');
             }
           };
           reader.readAsText(file);
         }
       }
     }
-  }, [searchable]);
+  }, [searchable, showMessage]);
 
   const handleExport = useCallback(() => {
     try {
@@ -100,18 +110,22 @@ export default function ImportExport() {
       a.href = url;
       const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
       a.download = filename;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      showMessage('Database exported successfully!');
     } catch (error) {
       console.error('Failed to export', error);
+      showMessage('Failed to export data. Please try again.', 'error');
     }
-  }, [dbImages]);
+  }, [dbImages, showMessage]);
 
   // ⚡ Performance: Memoize image lists to prevent re-rendering when 'searchable' or other state changes
   const renderedImportedImages = useMemo(() => (
-    images.map((img) => (
+    images.map((img, idx) => (
       <Box
-        key={img.substring(0, 50)}
+        key={`imported-${idx}`}
         sx={{
           width: 120,
           height: 120,
@@ -126,7 +140,7 @@ export default function ImportExport() {
       >
         <img
           src={img}
-          alt="imported"
+          alt={`imported-${idx}`}
           style={{ maxWidth: '100%', maxHeight: '100%' }}
           loading="lazy"
         />
@@ -135,9 +149,9 @@ export default function ImportExport() {
   ), [images]);
 
   const renderedDbImages = useMemo(() => (
-    dbImages.map((img) => (
+    dbImages.map((img, idx) => (
       <Box
-        key={img.substring(0, 50)}
+        key={`db-${idx}`}
         sx={{
           width: 80,
           height: 80,
@@ -152,7 +166,7 @@ export default function ImportExport() {
       >
         <img
           src={img}
-          alt="searchable"
+          alt={`dbimg-${idx}`}
           style={{ maxWidth: '100%', maxHeight: '100%' }}
           loading="lazy"
         />
@@ -182,15 +196,21 @@ export default function ImportExport() {
       />
 
       <Box sx={{ mb: 4 }}>
+        <Tooltip title="Upload CSV, JSON, TXT, or Image files to your collection" arrow>
+          <Button
+            variant="contained"
+            startIcon={<UploadFileIcon />}
+            onClick={() => fileInputRef.current?.click()}
+            sx={{ mr: 2 }}
+          >
+            Import Files or Images
+          </Button>
+        </Tooltip>
         <Button
-          variant="contained"
-          startIcon={<UploadFileIcon />}
-          onClick={() => fileInputRef.current?.click()}
-          sx={{ mr: 2 }}
+          variant="outlined"
+          onClick={handleExport}
+          disabled={dbImages.length === 0}
         >
-          Import Files or Images
-        </Button>
-        <Button variant="outlined" onClick={handleExport} disabled={dbImages.length === 0}>
           Export Search Database
         </Button>
       </Box>
@@ -225,6 +245,22 @@ export default function ImportExport() {
           </Box>
         </>
       )}
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 }
