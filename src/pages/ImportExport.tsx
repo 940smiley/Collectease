@@ -1,8 +1,19 @@
 // Import/Export page: Placeholder
-import { Typography, Paper } from '@mui/material';
 import { useRef, useState } from 'react';
+import {
+  Typography,
+  Paper,
+  Button,
+  Box,
+  FormControlLabel,
+  Checkbox,
+  Snackbar,
+  Alert,
+  Tooltip,
+  CircularProgress,
+} from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { Button, Box, FormControlLabel, Checkbox, Snackbar, Alert, Tooltip } from '@mui/material';
+import DownloadIcon from '@mui/icons-material/Download';
 
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
@@ -21,63 +32,73 @@ function getImagesFromSearchDB(): string[] {
 export default function ImportExport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<string[]>([]);
+  const [importing, setImporting] = useState(false);
   const [searchable, setSearchable] = useState(false);
   const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error',
+  });
 
   const showMessage = (message: string, severity: 'success' | 'error' = 'success') => {
     setSnackbar({ open: true, message, severity });
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files && files.length > 0) {
-      const newImages: string[] = [];
-      let loaded = 0;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.type.startsWith('image/')) {
+    if (!files || files.length === 0) return;
+
+    setImporting(true);
+    try {
+      const filePromises = Array.from(files).map((file) => {
+        return new Promise<{ type: 'image' | 'text'; data: string }>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (e) => {
-            const imageUrl = e.target?.result as string;
-            newImages.push(imageUrl);
-            loaded++;
-            if (loaded === files.length) {
-              setImages((prev) => [...prev, ...newImages]);
-              if (searchable) {
-if (loaded === files.length) {
-  setImages((prev) => {
-    const updatedImages = [...prev, ...newImages];
-    if (searchable) {
-      // Add the updated list to the search database
-      saveImagesToSearchDB(updatedImages);
-      setDbImages(getImagesFromSearchDB());
-      showMessage('Images imported and added to the search database!');
-    } else {
-      showMessage(`${newImages.length} images imported successfully!`);
-    }
-    return updatedImages;
-  });
-}
-                saveImagesToSearchDB([...images, ...newImages]);
-                setDbImages(getImagesFromSearchDB());
-                showMessage('Images imported and added to the search database!');
-              } else {
-                showMessage(`${newImages.length} images imported successfully!`);
-              }
-            }
+            resolve({
+              type: file.type.startsWith('image/') ? 'image' : 'text',
+              data: e.target?.result as string,
+            });
           };
-          reader.readAsDataURL(file);
-        } else {
-          // For non-image files, just read as text
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const text = e.target?.result;
-            showMessage('File imported successfully!');
-            console.log('Imported file contents:', text);
-          };
-          reader.readAsText(file);
+          reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
+          if (file.type.startsWith('image/')) {
+            reader.readAsDataURL(file);
+          } else {
+            reader.readAsText(file);
+          }
+        });
+      });
+
+      const results = await Promise.all(filePromises);
+      const newImages = results.filter((r) => r.type === 'image').map((r) => r.data);
+      const textFilesCount = results.filter((r) => r.type === 'text').length;
+
+      if (newImages.length > 0) {
+        setImages((prev) => [...prev, ...newImages]);
+        if (searchable) {
+          saveImagesToSearchDB(newImages);
+          setDbImages(getImagesFromSearchDB());
         }
+      }
+
+      if (searchable && newImages.length > 0) {
+        showMessage('Images imported and added to the search database!');
+      } else if (newImages.length > 0 || textFilesCount > 0) {
+        const message = [
+          newImages.length > 0 ? `${newImages.length} images` : '',
+          textFilesCount > 0 ? `${textFilesCount} files` : '',
+        ]
+          .filter(Boolean)
+          .join(' and ');
+        showMessage(`${message} imported successfully!`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to import some files.';
+      showMessage(errorMessage, 'error');
+    } finally {
+      setImporting(false);
+      if (event.target) {
+        event.target.value = '';
       }
     }
   };
@@ -121,16 +142,36 @@ if (loaded === files.length) {
         label="Mark imported images as searchable (for image recognition/search)"
         sx={{ mb: 2 }}
       />
-      <Tooltip title="Upload CSV, JSON, TXT, or Image files to your collection" arrow>
-        <Button
-          variant="contained"
-          startIcon={<UploadFileIcon />}
-          onClick={() => fileInputRef.current?.click()}
-          sx={{ mt: 2 }}
-        >
-          Import Files or Images
-        </Button>
-      </Tooltip>
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 2 }}>
+        <Tooltip title="Upload CSV, JSON, TXT, or Image files to your collection" arrow>
+          <span>
+            <Button
+              variant="contained"
+              startIcon={
+                importing ? <CircularProgress size={20} color="inherit" /> : <UploadFileIcon />
+              }
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+            >
+              {importing ? 'Importing...' : 'Import Files or Images'}
+            </Button>
+          </span>
+        </Tooltip>
+
+        <Tooltip title="Export your search database as a JSON file" arrow>
+          <span>
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              onClick={handleExport}
+              disabled={dbImages.length === 0}
+            >
+              Export Search Database
+            </Button>
+          </span>
+        </Tooltip>
+      </Box>
+
       <input
         type="file"
         accept=".csv,.json,.txt,image/*"
@@ -138,6 +179,7 @@ if (loaded === files.length) {
         style={{ display: 'none' }}
         onChange={handleFileChange}
         multiple
+        aria-label="Upload collection files"
       />
       {images.length > 0 && (
         <>
@@ -215,9 +257,6 @@ if (loaded === files.length) {
           </Box>
         </>
       )}
-      <Button variant="outlined" sx={{ mt: 4 }} onClick={handleExport}>
-        Export Search Database
-      </Button>
 
       <Snackbar
         open={snackbar.open}
