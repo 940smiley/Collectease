@@ -108,7 +108,6 @@ export default function ImportExport() {
   }, [dbImages]);
 
   // ⚡ Performance: Memoize image lists to prevent re-rendering when 'searchable' or other state changes
-  // ⚡ Performance: Memoize image lists to prevent re-rendering when 'searchable' or other state changes
   const renderedImportedImages = useMemo(() => (
     images.map((img) => (
       <Box
