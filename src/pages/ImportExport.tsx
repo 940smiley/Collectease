@@ -1,17 +1,19 @@
-// Import/Export page: Placeholder
-import { Typography, Paper } from '@mui/material';
+import { Typography, Paper, Button, Box, FormControlLabel, Checkbox, Snackbar, Alert, Tooltip } from '@mui/material';
 import { useRef, useState } from 'react';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { Button, Box, FormControlLabel, Checkbox, Snackbar, Alert, Tooltip } from '@mui/material';
 
-// Simulated image search database (in-memory for now)
+// Simulated image search database
 const imageSearchDBKey = 'collectease-image-search-db';
 
-function saveImagesToSearchDB(images: string[]) {
-  // Save images to localStorage for persistence
+/**
+ * Persists images to localStorage and returns the updated list.
+ * Using an append strategy to maintain history.
+ */
+function saveImagesToSearchDB(newImages: string[]): string[] {
   const existing = JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
-  const updated = [...existing, ...images];
+  const updated = [...existing, ...newImages];
   localStorage.setItem(imageSearchDBKey, JSON.stringify(updated));
+  return updated;
 }
 
 function getImagesFromSearchDB(): string[] {
@@ -22,64 +24,69 @@ export default function ImportExport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
-  const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  // Lazy initializer to prevent redundant LocalStorage reads on every component re-render
+  const [dbImages, setDbImages] = useState<string[]>(() => getImagesFromSearchDB());
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
   const showMessage = (message: string, severity: 'success' | 'error' = 'success') => {
     setSnackbar({ open: true, message, severity });
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files && files.length > 0) {
-      const newImages: string[] = [];
-      let loaded = 0;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.type.startsWith('image/')) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const imageUrl = e.target?.result as string;
-            newImages.push(imageUrl);
-            loaded++;
-            if (loaded === files.length) {
-              setImages((prev) => [...prev, ...newImages]);
-              if (searchable) {
-if (loaded === files.length) {
-  setImages((prev) => {
-    const updatedImages = [...prev, ...newImages];
-    if (searchable) {
-      // Add the updated list to the search database
-      saveImagesToSearchDB(updatedImages);
-      setDbImages(getImagesFromSearchDB());
-      showMessage('Images imported and added to the search database!');
-    } else {
-      showMessage(`${newImages.length} images imported successfully!`);
-    }
-    return updatedImages;
-  });
-}
-                saveImagesToSearchDB([...images, ...newImages]);
-                setDbImages(getImagesFromSearchDB());
-                showMessage('Images imported and added to the search database!');
-              } else {
-                showMessage(`${newImages.length} images imported successfully!`);
-              }
-            }
-          };
-          reader.readAsDataURL(file);
+    if (!files || files.length === 0) return;
+
+    const fileList = Array.from(files);
+    const imageFiles = fileList.filter(file => file.type.startsWith('image/'));
+    const otherFiles = fileList.filter(file => !file.type.startsWith('image/'));
+
+    // Process images in parallel using Promise.all for better performance
+    if (imageFiles.length > 0) {
+      try {
+        const newImageUrls = await Promise.all(
+          imageFiles.map(file => {
+            return new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = (e) => resolve(e.target?.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+          })
+        );
+
+        // Update local session state
+        setImages((prev) => [...prev, ...newImageUrls]);
+
+        if (searchable) {
+          // Optimization: Only persist the NEW images to the database.
+          // The persistence function handles merging with existing data.
+          // This avoids the O(n^2) duplication bug present in the original implementation
+          // where the entire session list was re-persisted on every upload.
+          const updatedDb = saveImagesToSearchDB(newImageUrls);
+          setDbImages(updatedDb);
+          showMessage('Images imported and added to the search database!');
         } else {
-          // For non-image files, just read as text
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const text = e.target?.result;
-            showMessage('File imported successfully!');
-            console.log('Imported file contents:', text);
-          };
-          reader.readAsText(file);
+          showMessage(`${newImageUrls.length} images imported successfully!`);
         }
+      } catch (error) {
+        console.error('Failed to read images', error);
+        showMessage('Failed to import some images.', 'error');
       }
     }
+
+    // Process other files
+    otherFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result;
+        showMessage('File imported successfully!');
+        console.log('Imported file contents:', text);
+      };
+      reader.readAsText(file);
+    });
+
+    // Reset input to allow re-importing same files if needed
+    event.target.value = '';
   };
 
   const handleExport = () => {
@@ -170,6 +177,7 @@ if (loaded === files.length) {
                 <img
                   src={img}
                   alt={`Imported item ${idx + 1}`}
+                  loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
               </Box>
@@ -208,6 +216,7 @@ if (loaded === files.length) {
                 <img
                   src={img}
                   alt={`Database item ${idx + 1}`}
+                  loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
               </Box>
