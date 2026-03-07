@@ -1,5 +1,4 @@
 // Import/Export page: Placeholder
-import { useRef, useState } from 'react';
 import {
   Typography,
   Paper,
@@ -11,6 +10,7 @@ import {
   Alert,
   Tooltip,
 } from '@mui/material';
+import { useRef, useState } from 'react';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DownloadIcon from '@mui/icons-material/Download';
 
@@ -226,10 +226,13 @@ if (loaded === files.length) {
         </>
       )}
       <Tooltip
-        title={dbImages.length === 0 ? 'No data available to export' : 'Download search database as JSON'}
+        title={
+          dbImages.length === 0 ? 'No data available to export' : 'Download search database as JSON'
+        }
         arrow
+        describeChild
       >
-        <Box component="span" sx={{ display: 'inline-block', mt: 4 }}>
+        <span style={{ display: 'inline-block', marginTop: '32px' }}>
           <Button
             variant="outlined"
             startIcon={<DownloadIcon />}
@@ -238,7 +241,7 @@ if (loaded === files.length) {
             sx={{ mt: 0 }}
           >
             Export Search Database
-        </Box>
+          </Button>
         </span>
       </Tooltip>
 

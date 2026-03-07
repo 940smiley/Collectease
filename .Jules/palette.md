@@ -5,7 +5,3 @@
 ## 2025-05-15 - [Accessible Alt Text Patterns]
 **Learning:** Generic alt text like `imported-0` is not helpful for screen reader users. Using a template like `Imported item 1` provides slightly better context.
 **Action:** When item names are not available, use descriptive placeholder templates for alt text to ensure basic accessibility.
-
-## 2025-05-15 - [Tooltips for Disabled Actions]
-**Learning:** Disabled buttons do not trigger mouse events, meaning a standard Tooltip wrapping a disabled button will not show up. This leaves users confused about why an action is unavailable.
-**Action:** Wrap disabled buttons in a `<span>` or `<div>` to ensure the Tooltip can still capture hover events and provide the necessary context to the user.
