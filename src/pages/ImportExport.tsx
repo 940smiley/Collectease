@@ -229,7 +229,7 @@ if (loaded === files.length) {
         title={dbImages.length === 0 ? 'No data available to export' : 'Download search database as JSON'}
         arrow
       >
-        <span style={{ display: 'inline-block', marginTop: '32px' }}>
+        <Box component="span" sx={{ display: 'inline-block', mt: 4 }}>
           <Button
             variant="outlined"
             startIcon={<DownloadIcon />}
@@ -238,7 +238,7 @@ if (loaded === files.length) {
             sx={{ mt: 0 }}
           >
             Export Search Database
-          </Button>
+        </Box>
         </span>
       </Tooltip>
 
