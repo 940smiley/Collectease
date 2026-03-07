@@ -1,8 +1,18 @@
 // Import/Export page: Placeholder
-import { Typography, Paper } from '@mui/material';
+import {
+  Typography,
+  Paper,
+  Button,
+  Box,
+  FormControlLabel,
+  Checkbox,
+  Snackbar,
+  Alert,
+  Tooltip,
+} from '@mui/material';
 import { useRef, useState } from 'react';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { Button, Box, FormControlLabel, Checkbox } from '@mui/material';
+import DownloadIcon from '@mui/icons-material/Download';
 
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
@@ -13,14 +23,7 @@ const imageSearchDBKey = 'collectease-image-search-db';
  */
 function saveImagesToSearchDB(images: string[]) {
   // Save images to localStorage for persistence
-  try {
-    const existing = JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
-    const updated = [...existing, ...images];
-    localStorage.setItem(imageSearchDBKey, JSON.stringify(updated));
-  } catch (error) {
-    console.error('Failed to save images to localStorage', error);
-    localStorage.setItem(imageSearchDBKey, JSON.stringify(images));
-  }
+  const existing = JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
   const updated = [...existing, ...images];
   localStorage.setItem(imageSearchDBKey, JSON.stringify(updated));
 }
@@ -36,6 +39,11 @@ export default function ImportExport() {
   // Optimization: Use lazy initialization to avoid expensive LocalStorage reads on every render.
   // Reduces initial component load time and prevents UI jank during re-renders.
   const [dbImages, setDbImages] = useState<string[]>(() => getImagesFromSearchDB());
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+
+  const showMessage = (message: string, severity: 'success' | 'error' = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
 
   /**
    * Optimization: Uses Promise.all to process multiple files in parallel.
@@ -46,37 +54,30 @@ export default function ImportExport() {
     if (files && files.length > 0) {
       const fileList = Array.from(files);
       const readPromises = fileList.map((file) => {
-        return new Promise<{ type: 'image' | 'text'; data: string } | null>((resolve) => {
+        return new Promise<string | null>((resolve) => {
           if (file.type.startsWith('image/')) {
             const reader = new FileReader();
-            reader.onload = (e) => resolve({ type: 'image', data: e.target?.result as string });
+            reader.onload = (e) => resolve(e.target?.result as string);
             reader.onerror = () => resolve(null);
             reader.readAsDataURL(file);
           } else {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              alert('File imported! (See console for contents)');
-              console.log('Imported file contents:', e.target?.result);
-              resolve({ type: 'text', data: e.target?.result as string });
-            };
-            reader.onerror = () => resolve(null);
-            reader.readAsText(file);
+            resolve(null);
           }
         });
       });
 
       const results = await Promise.all(readPromises);
-      const newImages = results
-        .filter((result): result is { type: 'image' | 'text'; data: string } => result !== null && result.type === 'image')
-        .map((result) => result.data);
+      const newImages = results.filter((img): img is string => img !== null);
 
       if (newImages.length > 0) {
         setImages((prev) => [...prev, ...newImages]);
         if (searchable) {
           // Optimized: Only pass NEW images to the append function.
           saveImagesToSearchDB(newImages);
-          setDbImages((prev) => [...prev, ...newImages]);
-          alert(`${newImages.length} images imported and added to the search database!`);
+          setDbImages(getImagesFromSearchDB());
+          showMessage(`${newImages.length} images imported and added to the search database!`);
+        } else {
+          showMessage(`${newImages.length} images imported successfully!`);
         }
       }
     }
@@ -98,8 +99,10 @@ export default function ImportExport() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      showMessage('Database exported successfully!');
     } catch (error) {
       console.error('Failed to export', error);
+      showMessage('Failed to export data. Please try again.', 'error');
     }
   };
 
@@ -122,14 +125,16 @@ export default function ImportExport() {
         label="Mark imported images as searchable (for image recognition/search)"
         sx={{ mb: 2 }}
       />
-      <Button
-        variant="contained"
-        startIcon={<UploadFileIcon />}
-        onClick={() => fileInputRef.current?.click()}
-        sx={{ mt: 2 }}
-      >
-        Import Files or Images
-      </Button>
+      <Tooltip title="Upload CSV, JSON, TXT, or Image files to your collection" arrow>
+        <Button
+          variant="contained"
+          startIcon={<UploadFileIcon />}
+          onClick={() => fileInputRef.current?.click()}
+          sx={{ mt: 2 }}
+        >
+          Import Files or Images
+        </Button>
+      </Tooltip>
       <input
         type="file"
         accept=".csv,.json,.txt,image/*"
@@ -168,7 +173,7 @@ export default function ImportExport() {
               >
                 <img
                   src={img}
-                  alt={`imported-${idx}`}
+                  alt={`Imported item ${idx + 1}`}
                   // Optimization: Defer decoding and rendering of images until they are in the viewport.
                   loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
@@ -208,7 +213,7 @@ export default function ImportExport() {
               >
                 <img
                   src={img}
-                  alt={`dbimg-${idx}`}
+                  alt={`Database item ${idx + 1}`}
                   // Optimization: Defer decoding and rendering of images until they are in the viewport.
                   loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
@@ -218,9 +223,40 @@ export default function ImportExport() {
           </Box>
         </>
       )}
-      <Button variant="outlined" sx={{ mt: 4 }} onClick={handleExport}>
-        Export Search Database
-      </Button>
+
+      <Tooltip
+        title={dbImages.length === 0 ? 'No images in database to export' : 'Export search database as a JSON file'}
+        arrow
+        describeChild
+      >
+        <span>
+          <Button
+            variant="outlined"
+            sx={{ mt: 4 }}
+            onClick={handleExport}
+            disabled={dbImages.length === 0}
+            startIcon={<DownloadIcon />}
+          >
+            Export Search Database
+          </Button>
+        </span>
+      </Tooltip>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 }
