@@ -1,8 +1,18 @@
 // Import/Export page: Placeholder
-import { Typography, Paper } from '@mui/material';
 import { useRef, useState } from 'react';
+import {
+  Typography,
+  Paper,
+  Button,
+  Box,
+  FormControlLabel,
+  Checkbox,
+  Snackbar,
+  Alert,
+  Tooltip,
+} from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { Button, Box, FormControlLabel, Checkbox, Snackbar, Alert, Tooltip } from '@mui/material';
+import DownloadIcon from '@mui/icons-material/Download';
 
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
@@ -215,9 +225,22 @@ if (loaded === files.length) {
           </Box>
         </>
       )}
-      <Button variant="outlined" sx={{ mt: 4 }} onClick={handleExport}>
-        Export Search Database
-      </Button>
+      <Tooltip
+        title={dbImages.length === 0 ? 'No data available to export' : 'Download search database as JSON'}
+        arrow
+      >
+        <span style={{ display: 'inline-block', marginTop: '32px' }}>
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={handleExport}
+            disabled={dbImages.length === 0}
+            sx={{ mt: 0 }}
+          >
+            Export Search Database
+          </Button>
+        </span>
+      </Tooltip>
 
       <Snackbar
         open={snackbar.open}
