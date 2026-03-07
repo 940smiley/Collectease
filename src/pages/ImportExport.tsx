@@ -46,20 +46,29 @@ export default function ImportExport() {
     if (files && files.length > 0) {
       const fileList = Array.from(files);
       const readPromises = fileList.map((file) => {
-        return new Promise<string | null>((resolve) => {
+        return new Promise<{ type: 'image' | 'text'; data: string } | null>((resolve) => {
           if (file.type.startsWith('image/')) {
             const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.onload = (e) => resolve({ type: 'image', data: e.target?.result as string });
             reader.onerror = () => resolve(null);
             reader.readAsDataURL(file);
           } else {
-            resolve(null);
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              alert('File imported! (See console for contents)');
+              console.log('Imported file contents:', e.target?.result);
+              resolve({ type: 'text', data: e.target?.result as string });
+            };
+            reader.onerror = () => resolve(null);
+            reader.readAsText(file);
           }
         });
       });
 
       const results = await Promise.all(readPromises);
-      const newImages = results.filter((img): img is string => img !== null);
+      const newImages = results
+        .filter((result): result is { type: 'image' | 'text'; data: string } => result !== null && result.type === 'image')
+        .map((result) => result.data);
 
       if (newImages.length > 0) {
         setImages((prev) => [...prev, ...newImages]);
