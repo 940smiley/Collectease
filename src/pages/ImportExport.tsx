@@ -66,7 +66,7 @@ export default function ImportExport() {
         if (searchable) {
           // Optimized: Only pass NEW images to the append function.
           saveImagesToSearchDB(newImages);
-          setDbImages(getImagesFromSearchDB());
+          setDbImages((prev) => [...prev, ...newImages]);
           alert(`${newImages.length} images imported and added to the search database!`);
         }
       }
