@@ -1,0 +1,56 @@
+name: Dependabot Helper
+
+on:
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dependabot-helper:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+        continue-on-error: true
+
+      - name: Install dependencies
+        if: hashFiles('package-lock.json', 'package.json') != ''
+        run: npm ci || npm install
+        continue-on-error: true
+
+      - name: Run fixes
+        run: |
+          if npm run | grep -q "lint"; then
+            npm run lint -- --fix || true
+          fi
+          if [ -f "package.json" ]; then
+            npx prettier --write . || true
+          fi
+        continue-on-error: true
+
+      - name: Run tests
+        run: |
+          if npm run | grep -q "test"; then
+            npm test || true
+          fi
+        continue-on-error: true
+
+      - name: Commit fixes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: fix dependabot compatibility and formatting"
+          skip_fetch: true
+          skip_checkout: true

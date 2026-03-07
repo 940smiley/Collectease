@@ -1,0 +1,63 @@
+name: Repo Health Report
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Weekly on Sundays
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  health-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Generate Report
+        id: report
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "## Repository Health Report - $(date +'%Y-%m-%d')" >> $GITHUB_STEP_SUMMARY
+
+          echo "### 📦 Dependency Status" >> $GITHUB_STEP_SUMMARY
+          # Node
+          if [ -f "package.json" ]; then
+            echo "#### Node.js (npm)" >> $GITHUB_STEP_SUMMARY
+            OUTDATED=$(npm outdated || true)
+            if [ -n "$OUTDATED" ]; then
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "$OUTDATED" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ All npm packages up to date." >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          # Python
+          if [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
+            echo "#### Python (pip)" >> $GITHUB_STEP_SUMMARY
+            pip list --outdated >> $GITHUB_STEP_SUMMARY || true
+          fi
+
+          echo "### 🛠️ Lint & Tests" >> $GITHUB_STEP_SUMMARY
+          if npm run | grep -q "lint"; then
+            echo "- **Lint:** $(npm run lint > /dev/null 2>&1 && echo '✅ Passing' || echo '❌ Failing')" >> $GITHUB_STEP_SUMMARY
+          fi
+          if npm run | grep -q "test"; then
+            echo "- **Tests:** $(npm test > /dev/null 2>&1 && echo '✅ Passing' || echo '❌ Failing')" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "### 🏗️ Open Pull Requests" >> $GITHUB_STEP_SUMMARY
+          gh pr list --limit 10 --json number,title,author,createdAt --template '{{range .}}- PR #{{.number}}: {{.title}} by @{{.author.login}} ({{.createdAt}})\n{{end}}' >> $GITHUB_STEP_SUMMARY || echo "No open PRs found." >> $GITHUB_STEP_SUMMARY
+
+          echo "### 🐛 Open Issues" >> $GITHUB_STEP_SUMMARY
+          gh issue list --limit 10 --json number,title,labels --template '{{range .}}- Issue #{{.number}}: {{.title}} {{range .labels}}[{{.name}}]{{end}}\n{{end}}' >> $GITHUB_STEP_SUMMARY || echo "No open issues found." >> $GITHUB_STEP_SUMMARY
