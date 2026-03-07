@@ -1,0 +1,62 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main, master]
+  schedule:
+    - cron: '0 0 * * *' # Daily
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  security-audit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Node.js Security Audit
+        if: hashFiles('package-lock.json') != ''
+        run: |
+          npm audit --audit-level=high || echo "NODE_AUDIT_FAIL=true" >> $GITHUB_ENV
+          npm audit fix || true
+        continue-on-error: true
+
+      - name: Python Security Audit
+        if: hashFiles('requirements.txt', 'pyproject.toml') != ''
+        run: |
+          pip install pip-audit
+          pip-audit || echo "PYTHON_AUDIT_FAIL=true" >> $GITHUB_ENV
+        continue-on-error: true
+
+      - name: Go Security Audit
+        if: hashFiles('go.mod') != ''
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./... || echo "GO_AUDIT_FAIL=true" >> $GITHUB_ENV
+        continue-on-error: true
+
+      - name: Rust Security Audit
+        if: hashFiles('Cargo.lock') != ''
+        run: |
+          cargo install cargo-audit
+          cargo audit || echo "RUST_AUDIT_FAIL=true" >> $GITHUB_ENV
+        continue-on-error: true
+
+      - name: Commit fixes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: automated security fixes"
+          skip_fetch: true
+          skip_checkout: true
+
+      - name: Open Issue on Vulnerabilities
+        if: env.NODE_AUDIT_FAIL == 'true' || env.PYTHON_AUDIT_FAIL == 'true' || env.GO_AUDIT_FAIL == 'true' || env.RUST_AUDIT_FAIL == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create --title "Security Vulnerabilities Found" --body "Automated security audit detected vulnerabilities in dependencies. Some may have been fixed automatically. Please review the workflow logs for details." --label "security" || echo "Issue already exists or could not be created"
