@@ -225,7 +225,24 @@ if (loaded === files.length) {
           </Box>
         </>
       )}
-      <Tooltip
+// Alternative pattern for improved AT clarity
+<Tooltip
+  title={dbImages.length === 0 ? 'No images in database to export' : 'Export search database as a JSON file'}
+  arrow
+  describeChild // MUI prop that adds aria-describedby
+>
+  <span>
+    <Button
+      variant="outlined"
+      sx={{ mt: 4 }}
+      onClick={handleExport}
+      disabled={dbImages.length === 0}
+      startIcon={<DownloadIcon />}
+    >
+      Export Search Database
+    </Button>
+  </span>
+</Tooltip>
         title={dbImages.length === 0 ? 'No images in database to export' : 'Export search database as a JSON file'}
         arrow
       >
