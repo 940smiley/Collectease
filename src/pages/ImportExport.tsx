@@ -13,7 +13,14 @@ const imageSearchDBKey = 'collectease-image-search-db';
  */
 function saveImagesToSearchDB(images: string[]) {
   // Save images to localStorage for persistence
-  const existing = JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
+  try {
+    const existing = JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
+    const updated = [...existing, ...images];
+    localStorage.setItem(imageSearchDBKey, JSON.stringify(updated));
+  } catch (error) {
+    console.error('Failed to save images to localStorage', error);
+    localStorage.setItem(imageSearchDBKey, JSON.stringify(images));
+  }
   const updated = [...existing, ...images];
   localStorage.setItem(imageSearchDBKey, JSON.stringify(updated));
 }
