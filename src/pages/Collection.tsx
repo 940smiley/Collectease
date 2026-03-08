@@ -1,5 +1,5 @@
 // Collection page: Placeholder for category/item management
-import { Typography, Paper } from '@mui/material';
+import { Typography, Paper } from "@mui/material";
 
 export default function Collection() {
   return (

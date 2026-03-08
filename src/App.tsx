@@ -1,17 +1,22 @@
-import { Suspense } from 'react';
-import { Box, CircularProgress, CssBaseline, ThemeProvider } from '@mui/material';
-import { createTheme } from '@mui/material/styles';
-import { useRoutes } from 'react-router-dom';
+import { Suspense } from "react";
+import {
+  Box,
+  CircularProgress,
+  CssBaseline,
+  ThemeProvider,
+} from "@mui/material";
+import { createTheme } from "@mui/material/styles";
+import { useRoutes } from "react-router-dom";
 
-import routes from './routes';
+import routes from "./routes";
 
-import './App.css'
+import "./App.css";
 
 const theme = createTheme({
   palette: {
-    mode: 'light',
-    primary: { main: '#1976d2' },
-    secondary: { main: '#9c27b0' },
+    mode: "light",
+    primary: { main: "#1976d2" },
+    secondary: { main: "#9c27b0" },
   },
 });
 
@@ -24,10 +29,10 @@ function App() {
         fallback={
           <Box
             sx={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              height: '100vh',
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              height: "100vh",
             }}
           >
             <CircularProgress />
@@ -40,4 +45,4 @@ function App() {
   );
 }
 
-export default App
+export default App;

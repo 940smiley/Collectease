@@ -11,11 +11,13 @@ Collectease is a collectibles management app designed to help you organize, valu
 - **Marketplace Integration:** Easily list items on eBay, Facebook Marketplace, and more.
 
 ## Tech Stack
+
 - React + TypeScript
 - Vite
 - Material-UI (MUI)
 
 ## Project Structure
+
 - `src/components` – Reusable UI components
 - `src/pages` – Main pages (Dashboard, Collection, etc.)
 - `src/services` – API integrations
@@ -38,6 +40,7 @@ Collectease is a collectibles management app designed to help you organize, valu
    ```
 
 ## Roadmap
+
 - [ ] Build category and subcategory structure
 - [ ] Implement eBay pricing data integration
 - [ ] Add import/export functionality
@@ -45,4 +48,5 @@ Collectease is a collectibles management app designed to help you organize, valu
 - [ ] Launch on GitHub Pages
 
 ---
+
 Stay tuned for updates!
