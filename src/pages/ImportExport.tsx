@@ -30,15 +30,17 @@ export default function ImportExport() {
     if (files && files.length > 0) {
       const newImages: string[] = [];
       let loaded = 0;
+      let imageCount = 0;
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (file.type.startsWith('image/')) {
+          imageCount++;
           const reader = new FileReader();
           reader.onload = (e) => {
             const imageUrl = e.target?.result as string;
             newImages.push(imageUrl);
             loaded++;
-            if (loaded === files.length) {
+            if (loaded === imageCount) {
               setImages((prev) => [...prev, ...newImages]);
               if (searchable) {
                 // Optimize: Save only the NEW images to the database.
