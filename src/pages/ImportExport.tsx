@@ -75,16 +75,12 @@ export default function ImportExport() {
     }
 
     // Process other files
-    // Process other files
     otherFiles.forEach(file => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target?.result;
         showMessage('File imported successfully!');
         console.log('Imported file contents:', text);
-      };
-      reader.onerror = () => {
-        showMessage(`Failed to read file: ${file.name}`, 'error');
       };
       reader.readAsText(file);
     });
