@@ -1,5 +1,5 @@
 // Share page: Placeholder
-import { Typography, Paper } from "@mui/material";
+import { Typography, Paper } from '@mui/material';
 
 export default function Share() {
   return (
