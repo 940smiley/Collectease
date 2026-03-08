@@ -49,7 +49,7 @@ export default function ImportExport() {
 
   const handleExport = () => {
     try {
-      if (dbImages.length === 0) return setSb({ open: true, msg: 'Database is empty' });
+      if (dbImages.length === 0) return setSb({ open: true, msg: 'Database is empty', severity: 'warning' });
       const url = URL.createObjectURL(new Blob([JSON.stringify(dbImages)], { type: 'application/json' }));
       const a = document.createElement('a');
       a.href = url;
