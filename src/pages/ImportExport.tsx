@@ -253,7 +253,7 @@ export default function ImportExport() {
           >
             Export Search Database
           </Button>
-        </span>
+        </Box>
       </Tooltip>
 
       <Snackbar
