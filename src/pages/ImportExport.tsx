@@ -56,7 +56,7 @@ export default function ImportExport() {
       a.download = 'search-db.json';
       a.click();
       URL.revokeObjectURL(url);
-      setSb({ open: true, msg: 'Export successful!' });
+      setSb({ open: true, msg: 'Export successful!', severity: 'success' });
     } catch {
       setSb({ open: true, msg: 'Export failed' });
     }
