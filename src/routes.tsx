@@ -3,6 +3,8 @@ import { lazy } from 'react';
 import type { RouteObject } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
 
+// ⚡ Performance: Route-based code splitting
+// These components will be loaded only when the user navigates to the respective route.
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Collection = lazy(() => import('./pages/Collection'));
 const ImportExport = lazy(() => import('./pages/ImportExport'));
