@@ -149,9 +149,9 @@ export default function ImportExport() {
   ), [images]);
 
   const renderedDbImages = useMemo(() => (
-    dbImages.map((img, idx) => (
+    dbImages.map((img) => (
       <Box
-        key={`db-${idx}`}
+        key={getImageKey(img)}
         sx={{
           width: 80,
           height: 80,
@@ -166,7 +166,7 @@ export default function ImportExport() {
       >
         <img
           src={img}
-          alt={`dbimg-${idx}`}
+          alt="searchable"
           style={{ maxWidth: '100%', maxHeight: '100%' }}
           loading="lazy"
         />
