@@ -58,7 +58,7 @@ export default function ImportExport() {
       URL.revokeObjectURL(url);
       setSb({ open: true, msg: 'Export successful!', severity: 'success' });
     } catch {
-      setSb({ open: true, msg: 'Export failed' });
+      setSb({ open: true, msg: 'Export failed', severity: 'error' });
     }
   };
 
