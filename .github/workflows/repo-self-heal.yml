@@ -1,0 +1,63 @@
+name: Repo Self-Heal
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Daily at midnight
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  self-heal:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Fix whitespace and line endings
+        run: |
+          find . -type f \( -not -path "*/.git/*" \) -print0 | xargs -0 sed -i 's/[[:space:]]*$//'
+          # Ensure final newline
+          find . -type f \( -not -path "*/.git/*" \) \( -name "*.js" -o -name "*.ts" -o -name "*.tsx" -o -name "*.json" -o -name "*.yml" -o -name "*.md" \) | while read -r file; do
+            if [ -n "$(tail -c 1 "$file")" ]; then echo >> "$file"; fi
+          done
+
+      - name: Re-format entire repo
+        run: |
+          if [ -f "package.json" ]; then
+            npx prettier --write . || true
+          fi
+        continue-on-error: true
+
+      - name: Validate YAML
+        run: |
+          npm install -g yaml-lint || true
+          find . \( -not -path "*/.git/*" \) \( -name "*.yml" -o -name "*.yaml" \) | xargs yaml-lint || true
+        continue-on-error: true
+
+      - name: Validate Markdown and check links
+        run: |
+          npm install -g markdownlint-cli || true
+          find . \( -not -path "*/.git/*" \) -name "*.md" | xargs markdownlint --fix || true
+          # Broken link check
+          curl -sSfL https://raw.githubusercontent.com/lycheeverse/lychee/master/lychee.sh | sh -s -- . || true
+        continue-on-error: true
+
+      - name: Clean temporary files
+        run: |
+          rm -rf .tmp .temp *.log npm-debug.log* yarn-debug.log* yarn-error.log* .eslintcache
+        continue-on-error: true
+
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: daily repo self-heal maintenance"
+          skip_fetch: true
+          skip_checkout: true

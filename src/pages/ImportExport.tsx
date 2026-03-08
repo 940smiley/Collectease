@@ -232,7 +232,7 @@ if (loaded === files.length) {
         arrow
         describeChild
       >
-        <Box component="span" sx={{ display: 'inline-block', mt: 4 }}>
+        <span style={{ display: 'inline-block', marginTop: '32px' }}>
           <Button
             variant="outlined"
             startIcon={<DownloadIcon />}
@@ -242,7 +242,7 @@ if (loaded === files.length) {
           >
             Export Search Database
           </Button>
-        </Box>
+        </span>
       </Tooltip>
 
       <Snackbar
