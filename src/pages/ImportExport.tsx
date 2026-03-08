@@ -23,7 +23,7 @@ export default function ImportExport() {
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
   const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
-  const [sb, setSb] = useState({ open: false, msg: '' });
+  const [sb, setSb] = useState({ open: false, msg: '', severity: 'success' as 'success' | 'error' | 'warning' | 'info' });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []).filter(f => f.type.startsWith('image/'));
