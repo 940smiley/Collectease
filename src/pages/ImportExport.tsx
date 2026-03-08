@@ -8,6 +8,7 @@ import {
   Checkbox,
   Snackbar,
   Alert,
+  CircularProgress,
   Tooltip,
 } from '@mui/material';
 import { useRef, useState } from 'react';
@@ -33,84 +34,91 @@ export default function ImportExport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
-  // Use lazy initializer to avoid reading from localStorage on every re-render
-  const [dbImages, setDbImages] = useState<string[]>(() => getImagesFromSearchDB());
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [isImporting, setIsImporting] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({ open: false, message: '', severity: 'success' });
+  const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
 
-  const showMessage = (message: string, severity: 'success' | 'error' = 'success') => {
-    setSnackbar({ open: true, message, severity });
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files && files.length > 0) {
-      const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
-      const nonImageFiles = Array.from(files).filter(f => !f.type.startsWith('image/'));
+    if (!files || files.length === 0) return;
 
-      if (imageFiles.length > 0) {
-        const newImages: string[] = [];
-        let loaded = 0;
-        imageFiles.forEach((file) => {
-          const reader = new FileReader();
+    setIsImporting(true);
+    const newImages: string[] = [];
+
+    const filePromises = Array.from(files).map((file) => {
+      return new Promise<void>((resolve) => {
+        const reader = new FileReader();
+        if (file.type.startsWith('image/')) {
           reader.onload = (e) => {
             const imageUrl = e.target?.result as string;
             newImages.push(imageUrl);
-            loaded++;
-
-            if (loaded === imageFiles.length) {
-              setImages((prev) => {
-                const updatedImages = [...prev, ...newImages];
-                if (searchable) {
-                  const updatedDb = saveImagesToSearchDB(newImages); // Only save the NEW images to DB
-                  setDbImages(updatedDb);
-                  showMessage(`${newImages.length} images imported and added to search database!`);
-                } else {
-                  showMessage(`${newImages.length} images imported successfully!`);
-                }
-                return updatedImages;
-              });
-            }
+            resolve();
+          };
+          reader.onerror = () => {
+            console.error('Failed to read file:', file.name);
+            resolve();
           };
           reader.readAsDataURL(file);
-        });
-      }
-
-      nonImageFiles.forEach((file) => {
-        // For non-image files, just read as text
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const text = e.target?.result;
-          showMessage(`File ${file.name} imported successfully!`);
-          console.log('Imported file contents:', text);
-        };
-        reader.onerror = () => {
-          showMessage(`Failed to read ${file.name}`, 'error');
-        };
-        reader.readAsText(file);
+        } else {
+          reader.onload = (e) => {
+            console.log('Imported file contents:', e.target?.result);
+            resolve();
+          };
+          reader.onerror = () => resolve();
+          reader.readAsText(file);
+        }
       });
+    });
 
-      // Clear the input value so the same file can be selected again
-      event.target.value = '';
+    await Promise.all(filePromises);
+    setImages((prev) => [...prev, ...newImages]);
+
+    const imageCount = newImages.length;
+    const otherCount = files.length - imageCount;
+
+    if (searchable && imageCount > 0) {
+      saveImagesToSearchDB(newImages);
+      setDbImages(getImagesFromSearchDB());
     }
+
+    let message = '';
+    if (imageCount > 0 && otherCount > 0) {
+      message = `Imported ${imageCount} images and ${otherCount} files.`;
+    } else if (imageCount > 0) {
+      message = `Imported ${imageCount} image${imageCount > 1 ? 's' : ''} successfully!`;
+    } else if (otherCount > 0) {
+      message = `Imported ${otherCount} file${otherCount > 1 ? 's' : ''} successfully!`;
+    }
+
+    if (message) {
+      setSnackbar({ open: true, message, severity: 'success' });
+    }
+
+    setIsImporting(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleExport = () => {
     try {
+      if (dbImages.length === 0) return;
       const dataStr = JSON.stringify(dbImages, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const filename = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
-      a.download = filename;
+      a.download = `search-db-images-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showMessage('Database exported successfully!');
+      setSnackbar({ open: true, message: 'Database exported successfully!', severity: 'success' });
     } catch (error) {
-      console.error('Failed to export', error);
-      showMessage('Failed to export data. Please try again.', 'error');
+      console.error('Failed to export:', error);
+      setSnackbar({ open: true, message: 'Failed to export data. Please try again.', severity: 'error' });
     }
   };
 
@@ -133,16 +141,15 @@ export default function ImportExport() {
         label="Mark imported images as searchable (for image recognition/search)"
         sx={{ mb: 2 }}
       />
-      <Tooltip title="Upload CSV, JSON, TXT, or Image files to your collection" arrow>
-        <Button
-          variant="contained"
-          startIcon={<UploadFileIcon />}
-          onClick={() => fileInputRef.current?.click()}
-          sx={{ mt: 2 }}
-        >
-          Import Files or Images
-        </Button>
-      </Tooltip>
+      <Button
+        variant="contained"
+        startIcon={isImporting ? <CircularProgress size={20} color="inherit" /> : <UploadFileIcon />}
+        onClick={() => fileInputRef.current?.click()}
+        disabled={isImporting}
+        sx={{ mt: 2 }}
+      >
+        {isImporting ? 'Importing...' : 'Import Files or Images'}
+      </Button>
       <input
         type="file"
         accept=".csv,.json,.txt,image/*"
@@ -181,7 +188,7 @@ export default function ImportExport() {
               >
                 <img
                   src={img}
-                  alt={`Imported item ${idx + 1}`}
+                  alt={`imported-${idx}`}
                   loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
@@ -220,7 +227,7 @@ export default function ImportExport() {
               >
                 <img
                   src={img}
-                  alt={`Database item ${idx + 1}`}
+                  alt={`dbimg-${idx}`}
                   loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
@@ -236,7 +243,7 @@ export default function ImportExport() {
         arrow
         describeChild
       >
-        <Box component="span" sx={{ display: 'inline-block', mt: 4 }}>
+        <span style={{ display: 'inline-block', marginTop: '32px' }}>
           <Button
             variant="outlined"
             startIcon={<DownloadIcon />}
@@ -247,13 +254,12 @@ export default function ImportExport() {
             Export Search Database
           </Button>
         </span>
-        </Box>
+      </Tooltip>
 
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={4000}
+        autoHideDuration={6000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert
           onClose={() => setSnackbar({ ...snackbar, open: false })}
