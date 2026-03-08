@@ -45,7 +45,10 @@ export default function ImportExport() {
             newImages.push(imageUrl);
             resolve();
           };
-          reader.onerror = () => resolve();
+          reader.onerror = () => {
+            console.error('Failed to read file:', file.name);
+            resolve();
+          };
           reader.readAsDataURL(file);
         } else {
           reader.onload = (e) => {
