@@ -6,11 +6,12 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
 
-function saveImagesToSearchDB(images: string[]) {
+function saveImagesToSearchDB(images: string[]): string[] {
   // Save images to localStorage for persistence
   const existing = JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
   const updated = [...existing, ...images];
   localStorage.setItem(imageSearchDBKey, JSON.stringify(updated));
+  return updated;
 }
 
 function getImagesFromSearchDB(): string[] {
