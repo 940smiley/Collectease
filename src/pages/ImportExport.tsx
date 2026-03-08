@@ -180,7 +180,7 @@ export default function ImportExport() {
         Export Search Database
       </Button>
       <Snackbar open={sb.open} autoHideDuration={4000} onClose={() => setSb({ ...sb, open: false })}>
-        <Alert severity="success" sx={{ width: '100%' }}>{sb.msg}</Alert>
+        <Alert severity={sb.severity} sx={{ width: '100%' }}>{sb.msg}</Alert>
       </Snackbar>
     </Paper>
   );
