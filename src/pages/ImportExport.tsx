@@ -53,28 +53,18 @@ export default function ImportExport() {
             newImages.push(imageUrl);
             loaded++;
             if (loaded === files.length) {
-              setImages((prev) => [...prev, ...newImages]);
-              if (searchable) {
-if (loaded === files.length) {
-  setImages((prev) => {
-    const updatedImages = [...prev, ...newImages];
-    if (searchable) {
-      // Add the updated list to the search database
-      saveImagesToSearchDB(updatedImages);
-      setDbImages(getImagesFromSearchDB());
-      showMessage('Images imported and added to the search database!');
-    } else {
-      showMessage(`${newImages.length} images imported successfully!`);
-    }
-    return updatedImages;
-  });
-}
-                saveImagesToSearchDB([...images, ...newImages]);
-                setDbImages(getImagesFromSearchDB());
-                showMessage('Images imported and added to the search database!');
-              } else {
-                showMessage(`${newImages.length} images imported successfully!`);
-              }
+              setImages((prev) => {
+                const updatedImages = [...prev, ...newImages];
+                if (searchable) {
+                  // Add the updated list to the search database
+                  saveImagesToSearchDB(updatedImages);
+                  setDbImages(getImagesFromSearchDB());
+                  showMessage('Images imported and added to the search database!');
+                } else {
+                  showMessage(`${newImages.length} images imported successfully!`);
+                }
+                return updatedImages;
+              });
             }
           };
           reader.readAsDataURL(file);
@@ -231,7 +221,7 @@ if (loaded === files.length) {
         }
         arrow
         describeChild
-      >
+        <Box component="span" sx={{ display: 'inline-block', mt: 4 }}>
         <span style={{ display: 'inline-block', marginTop: '32px' }}>
           <Button
             variant="outlined"
@@ -241,7 +231,7 @@ if (loaded === files.length) {
             sx={{ mt: 0 }}
           >
             Export Search Database
-          </Button>
+        </Box>
         </span>
       </Tooltip>
 
