@@ -1,8 +1,18 @@
 // Import/Export page: Placeholder
-import { Typography, Paper } from '@mui/material';
+import {
+  Typography,
+  Paper,
+  Button,
+  Box,
+  FormControlLabel,
+  Checkbox,
+  Snackbar,
+  Alert,
+  Tooltip,
+} from '@mui/material';
 import { useRef, useState, useMemo, useCallback } from 'react';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import { Button, Box, FormControlLabel, Checkbox, Snackbar, Alert, Tooltip } from '@mui/material';
+import DownloadIcon from '@mui/icons-material/Download';
 
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
@@ -11,7 +21,7 @@ const imageSearchDBKey = 'collectease-image-search-db';
  * Saves unique images to localStorage to avoid redundant storage and memory bloat.
  * ⚡ Performance: Uses a Set to ensure O(1) duplicate checking.
  */
-function saveImagesToSearchDB(newImages: string[]) {
+function saveImagesToSearchDB(newImages: string[]): string[] {
   try {
     const existingStr = localStorage.getItem(imageSearchDBKey);
     const existing: string[] = existingStr ? JSON.parse(existingStr) : [];
@@ -25,11 +35,14 @@ function saveImagesToSearchDB(newImages: string[]) {
       }
     });
 
+    const updated = Array.from(existingSet);
     if (changed) {
-      localStorage.setItem(imageSearchDBKey, JSON.stringify(Array.from(existingSet)));
+      localStorage.setItem(imageSearchDBKey, JSON.stringify(updated));
     }
+    return updated;
   } catch (e) {
     console.error('Failed to save to localStorage', e);
+    return getImagesFromSearchDB();
   }
 }
 
@@ -46,7 +59,8 @@ export default function ImportExport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
-  const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  // Use lazy initializer to avoid reading from localStorage on every re-render
+  const [dbImages, setDbImages] = useState<string[]>(() => getImagesFromSearchDB());
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
   const showMessage = useCallback((message: string, severity: 'success' | 'error' = 'success') => {
@@ -56,26 +70,26 @@ export default function ImportExport() {
   const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
-      const newImages: string[] = [];
-      let loaded = 0;
-      const fileCount = files.length;
+      const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+      const nonImageFiles = Array.from(files).filter(f => !f.type.startsWith('image/'));
 
-      for (let i = 0; i < fileCount; i++) {
-        const file = files[i];
-        if (file.type.startsWith('image/')) {
+      if (imageFiles.length > 0) {
+        const newImages: string[] = [];
+        let loaded = 0;
+        imageFiles.forEach((file) => {
           const reader = new FileReader();
           reader.onload = (e) => {
             const imageUrl = e.target?.result as string;
             newImages.push(imageUrl);
             loaded++;
 
-            if (loaded === fileCount) {
+            if (loaded === imageFiles.length) {
               setImages((prev) => {
                 const updatedImages = [...prev, ...newImages];
                 if (searchable) {
-                  saveImagesToSearchDB(newImages);
-                  setDbImages(getImagesFromSearchDB());
-                  showMessage('Images imported and added to the search database!');
+                  const updatedDb = saveImagesToSearchDB(newImages); // Only save the NEW images to DB
+                  setDbImages(updatedDb);
+                  showMessage(`${newImages.length} images imported and added to search database!`);
                 } else {
                   showMessage(`${newImages.length} images imported successfully!`);
                 }
@@ -84,20 +98,25 @@ export default function ImportExport() {
             }
           };
           reader.readAsDataURL(file);
-        } else {
-          // For non-image files, just read as text
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const text = e.target?.result;
-            console.log('Imported file contents:', text);
-            loaded++;
-            if (loaded === fileCount) {
-              showMessage('File(s) imported successfully!');
-            }
-          };
-          reader.readAsText(file);
-        }
+        });
       }
+
+      nonImageFiles.forEach((file) => {
+        // For non-image files, just read as text
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const text = e.target?.result;
+          showMessage(`File ${file.name} imported successfully!`);
+          console.log('Imported file contents:', text);
+        };
+        reader.onerror = () => {
+          showMessage(`Failed to read ${file.name}`, 'error');
+        };
+        reader.readAsText(file);
+      });
+
+      // Clear the input value so the same file can be selected again
+      event.target.value = '';
     }
   }, [searchable, showMessage]);
 
@@ -140,7 +159,7 @@ export default function ImportExport() {
       >
         <img
           src={img}
-          alt={`imported-${idx}`}
+          alt={`Imported item ${idx + 1}`}
           style={{ maxWidth: '100%', maxHeight: '100%' }}
           loading="lazy"
         />
@@ -149,9 +168,9 @@ export default function ImportExport() {
   ), [images]);
 
   const renderedDbImages = useMemo(() => (
-    dbImages.map((img) => (
+    dbImages.map((img, idx) => (
       <Box
-        key={getImageKey(img)}
+        key={`db-${idx}`}
         sx={{
           width: 80,
           height: 80,
@@ -166,7 +185,7 @@ export default function ImportExport() {
       >
         <img
           src={img}
-          alt="searchable"
+          alt={`Database item ${idx + 1}`}
           style={{ maxWidth: '100%', maxHeight: '100%' }}
           loading="lazy"
         />
@@ -195,24 +214,33 @@ export default function ImportExport() {
         sx={{ mb: 2 }}
       />
 
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: 4, display: 'flex', gap: 2 }}>
         <Tooltip title="Upload CSV, JSON, TXT, or Image files to your collection" arrow>
           <Button
             variant="contained"
             startIcon={<UploadFileIcon />}
             onClick={() => fileInputRef.current?.click()}
-            sx={{ mr: 2 }}
           >
             Import Files or Images
           </Button>
         </Tooltip>
-        <Button
-          variant="outlined"
-          onClick={handleExport}
-          disabled={dbImages.length === 0}
+
+        <Tooltip
+          title={dbImages.length === 0 ? 'No images in database to export' : 'Export search database as a JSON file'}
+          arrow
+          describeChild
         >
-          Export Search Database
-        </Button>
+          <span>
+            <Button
+              variant="outlined"
+              onClick={handleExport}
+              disabled={dbImages.length === 0}
+              startIcon={<DownloadIcon />}
+            >
+              Export Search Database
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
 
       <input

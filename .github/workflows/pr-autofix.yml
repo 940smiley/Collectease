@@ -1,0 +1,70 @@
+name: PR Auto-Fix
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  pr-fix:
+    if: github.event.pull_request.draft == false && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+        continue-on-error: true
+
+      - name: Install dependencies
+        if: hashFiles('package-lock.json', 'package.json') != ''
+        run: npm ci || npm install
+        continue-on-error: true
+
+      - name: Run Lint and Test (Before Fixes)
+        run: |
+          if npm run | grep -q "test"; then
+            npm test || true
+          fi
+        continue-on-error: true
+
+      - name: Apply Fixes
+        run: |
+          if npm run | grep -q "lint"; then
+            npm run lint -- --fix || true
+          fi
+          if [ -f "package.json" ]; then
+            npx prettier --write . || true
+          fi
+        continue-on-error: true
+
+      - name: Run Test (After Fixes)
+        run: |
+          if npm run | grep -q "test"; then
+            npm test || echo "tests_failed=true" >> $GITHUB_ENV
+          fi
+        continue-on-error: true
+
+      - name: Update PR Branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr update-branch ${{ github.event.pull_request.number }} || true
+        continue-on-error: true
+
+      - name: Commit and push fixes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: auto-fix PR issues and formatting"
+          skip_fetch: true
+          skip_checkout: true

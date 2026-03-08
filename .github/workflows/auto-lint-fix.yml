@@ -1,0 +1,109 @@
+name: Auto Lint Fix
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  lint-fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+        continue-on-error: true
+
+      - name: Install Node dependencies
+        if: hashFiles('package-lock.json', 'package.json') != ''
+        run: npm ci || npm install
+        continue-on-error: true
+
+      - name: Lint and fix JS/TS
+        if: hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') != ''
+        run: |
+          if npm run | grep -q "lint"; then
+            npm run lint -- --fix || true
+          elif [ -f "eslint.config.js" ] || [ -f ".eslintrc.json" ]; then
+            npx eslint . --fix || true
+          fi
+          if [ -f "package.json" ]; then
+            npx prettier --write . || true
+          fi
+        continue-on-error: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+        if: hashFiles('**/*.py') != ''
+        continue-on-error: true
+
+      - name: Lint and fix Python
+        if: hashFiles('**/*.py') != ''
+        run: |
+          pip install ruff black isort
+          ruff check --fix . || true
+          black . || true
+          isort . || true
+        continue-on-error: true
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+        if: hashFiles('**/*.go') != ''
+        continue-on-error: true
+
+      - name: Lint and fix Go
+        if: hashFiles('**/*.go') != ''
+        run: go fmt ./...
+        continue-on-error: true
+
+      - name: Setup Rust
+        uses: actions/rust-toolchain@stable
+        with:
+          components: rustfmt
+        if: hashFiles('**/*.rs') != ''
+        continue-on-error: true
+
+      - name: Lint and fix Rust
+        if: hashFiles('**/*.rs') != ''
+        run: cargo fmt --all
+        continue-on-error: true
+
+      - name: Lint and fix YAML
+        if: hashFiles('**/*.yml', '**/*.yaml') != ''
+        run: |
+          if command -v npx &> /dev/null; then
+            npx prettier --write "**/*.yml" "**/*.yaml" || true
+          fi
+        continue-on-error: true
+
+      - name: Lint and fix Markdown
+        if: hashFiles('**/*.md') != ''
+        run: |
+          if command -v npx &> /dev/null; then
+            npx markdownlint-cli --fix "**/*.md" || true
+            npx prettier --write "**/*.md" || true
+          fi
+        continue-on-error: true
+
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: auto-fix linting and formatting issues"
+          skip_fetch: true
+          skip_checkout: true
