@@ -1,6 +1,6 @@
 // AppLayout: Main layout with MUI AppBar, Drawer, and content area
-import { Suspense, type ReactNode } from 'react';
-import { AppBar, Toolbar, Typography, Drawer, List, ListItem, ListItemIcon, ListItemText, ListItemButton, Box, CircularProgress } from '@mui/material';
+import type { ReactNode } from 'react';
+import { AppBar, Toolbar, Typography, Drawer, List, ListItem, ListItemIcon, ListItemText, ListItemButton, Box } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import CategoryIcon from '@mui/icons-material/Category';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
@@ -17,12 +17,6 @@ const navItems = [
   { text: 'Share', icon: <ShareIcon />, path: '/share' },
   { text: 'Marketplace', icon: <StorefrontIcon />, path: '/marketplace' },
 ];
-
-const PageLoader = () => (
-  <Box sx={{ display: 'flex', justifyContent: 'center', p: 8 }}>
-    <CircularProgress />
-  </Box>
-);
 
 export default function AppLayout({ children }: { children?: ReactNode }) {
   const location = useLocation();
@@ -61,10 +55,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: 3, ml: `${drawerWidth}px` }}>
         <Toolbar />
-        {/* ⚡ Performance: Suspense boundary for lazy-loaded routes */}
-        <Suspense fallback={<PageLoader />}>
-          {children || <Outlet />}
-        </Suspense>
+        {children || <Outlet />}
       </Box>
     </Box>
   );

@@ -10,49 +10,23 @@ import {
   Alert,
   Tooltip,
 } from '@mui/material';
-import { useRef, useState, useMemo, useCallback } from 'react';
+import { useRef, useState } from 'react';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DownloadIcon from '@mui/icons-material/Download';
 
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
 
-/**
- * Saves unique images to localStorage to avoid redundant storage and memory bloat.
- * ⚡ Performance: Uses a Set to ensure O(1) duplicate checking.
- */
-function saveImagesToSearchDB(newImages: string[]): string[] {
-  try {
-    const existingStr = localStorage.getItem(imageSearchDBKey);
-    const existing: string[] = existingStr ? JSON.parse(existingStr) : [];
-    const existingSet = new Set(existing);
-
-    let changed = false;
-    newImages.forEach(img => {
-      if (!existingSet.has(img)) {
-        existingSet.add(img);
-        changed = true;
-      }
-    });
-
-    const updated = Array.from(existingSet);
-    if (changed) {
-      localStorage.setItem(imageSearchDBKey, JSON.stringify(updated));
-    }
-    return updated;
-  } catch (e) {
-    console.error('Failed to save to localStorage', e);
-    return getImagesFromSearchDB();
-  }
+function saveImagesToSearchDB(images: string[]): string[] {
+  // Save images to localStorage for persistence
+  const existing = JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
+  const updated = [...existing, ...images];
+  localStorage.setItem(imageSearchDBKey, JSON.stringify(updated));
+  return updated;
 }
 
 function getImagesFromSearchDB(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
-  } catch (e) {
-    console.error('Failed to parse images from localStorage', e);
-    return [];
-  }
+  return JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
 }
 
 export default function ImportExport() {
@@ -63,11 +37,11 @@ export default function ImportExport() {
   const [dbImages, setDbImages] = useState<string[]>(() => getImagesFromSearchDB());
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
-  const showMessage = useCallback((message: string, severity: 'success' | 'error' = 'success') => {
+  const showMessage = (message: string, severity: 'success' | 'error' = 'success') => {
     setSnackbar({ open: true, message, severity });
-  }, []);
+  };
 
-  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
       const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
@@ -118,9 +92,9 @@ export default function ImportExport() {
       // Clear the input value so the same file can be selected again
       event.target.value = '';
     }
-  }, [searchable, showMessage]);
+  };
 
-  const handleExport = useCallback(() => {
+  const handleExport = () => {
     try {
       const dataStr = JSON.stringify(dbImages, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
@@ -138,60 +112,7 @@ export default function ImportExport() {
       console.error('Failed to export', error);
       showMessage('Failed to export data. Please try again.', 'error');
     }
-  }, [dbImages, showMessage]);
-
-  // ⚡ Performance: Memoize image lists to prevent re-rendering when 'searchable' or other state changes
-  const renderedImportedImages = useMemo(() => (
-    images.map((img, idx) => (
-      <Box
-        key={`imported-${idx}`}
-        sx={{
-          width: 120,
-          height: 120,
-          borderRadius: 2,
-          overflow: 'hidden',
-          border: '1px solid #ccc',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#fafafa',
-        }}
-      >
-        <img
-          src={img}
-          alt={`Imported item ${idx + 1}`}
-          style={{ maxWidth: '100%', maxHeight: '100%' }}
-          loading="lazy"
-        />
-      </Box>
-    ))
-  ), [images]);
-
-  const renderedDbImages = useMemo(() => (
-    dbImages.map((img, idx) => (
-      <Box
-        key={`db-${idx}`}
-        sx={{
-          width: 80,
-          height: 80,
-          borderRadius: 2,
-          overflow: 'hidden',
-          border: '1px solid #90caf9',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#e3f2fd',
-        }}
-      >
-        <img
-          src={img}
-          alt={`Database item ${idx + 1}`}
-          style={{ maxWidth: '100%', maxHeight: '100%' }}
-          loading="lazy"
-        />
-      </Box>
-    ))
-  ), [dbImages]);
+  };
 
   return (
     <Paper elevation={2} sx={{ p: 4 }}>
@@ -201,7 +122,6 @@ export default function ImportExport() {
       <Typography color="text.secondary" gutterBottom>
         Import your collection or export it to other platforms.
       </Typography>
-
       <FormControlLabel
         control={
           <Checkbox
@@ -213,36 +133,16 @@ export default function ImportExport() {
         label="Mark imported images as searchable (for image recognition/search)"
         sx={{ mb: 2 }}
       />
-
-      <Box sx={{ mb: 4, display: 'flex', gap: 2 }}>
-        <Tooltip title="Upload CSV, JSON, TXT, or Image files to your collection" arrow>
-          <Button
-            variant="contained"
-            startIcon={<UploadFileIcon />}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            Import Files or Images
-          </Button>
-        </Tooltip>
-
-        <Tooltip
-          title={dbImages.length === 0 ? 'No images in database to export' : 'Export search database as a JSON file'}
-          arrow
-          describeChild
+      <Tooltip title="Upload CSV, JSON, TXT, or Image files to your collection" arrow>
+        <Button
+          variant="contained"
+          startIcon={<UploadFileIcon />}
+          onClick={() => fileInputRef.current?.click()}
+          sx={{ mt: 2 }}
         >
-          <span>
-            <Button
-              variant="outlined"
-              onClick={handleExport}
-              disabled={dbImages.length === 0}
-              startIcon={<DownloadIcon />}
-            >
-              Export Search Database
-            </Button>
-          </span>
-        </Tooltip>
-      </Box>
-
+          Import Files or Images
+        </Button>
+      </Tooltip>
       <input
         type="file"
         accept=".csv,.json,.txt,image/*"
@@ -251,28 +151,117 @@ export default function ImportExport() {
         onChange={handleFileChange}
         multiple
       />
-
       {images.length > 0 && (
         <>
           <Typography variant="subtitle1" sx={{ mt: 3 }}>
-            Imported Images ({images.length}):
+            Imported Images:
           </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 1 }}>
-            {renderedImportedImages}
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 2,
+              mt: 1,
+            }}
+          >
+            {images.map((img, idx) => (
+              <Box
+                key={idx}
+                sx={{
+                  width: 120,
+                  height: 120,
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  border: '1px solid #ccc',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#fafafa',
+                }}
+              >
+                <img
+                  src={img}
+                  alt={`Imported item ${idx + 1}`}
+                  loading="lazy"
+                  style={{ maxWidth: '100%', maxHeight: '100%' }}
+                />
+              </Box>
+            ))}
           </Box>
         </>
       )}
-
       {dbImages.length > 0 && (
         <>
           <Typography variant="subtitle1" sx={{ mt: 4 }}>
-            Images in Search Database ({dbImages.length}):
+            Images in Search Database:
           </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 1 }}>
-            {renderedDbImages}
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 2,
+              mt: 1,
+            }}
+          >
+            {dbImages.map((img, idx) => (
+              <Box
+                key={idx}
+                sx={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  border: '1px solid #90caf9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#e3f2fd',
+                }}
+              >
+                <img
+                  src={img}
+                  alt={`Database item ${idx + 1}`}
+                  loading="lazy"
+                  style={{ maxWidth: '100%', maxHeight: '100%' }}
+                />
+              </Box>
+            ))}
           </Box>
         </>
       )}
+// Alternative pattern for improved AT clarity
+<Tooltip
+  title={dbImages.length === 0 ? 'No images in database to export' : 'Export search database as a JSON file'}
+  arrow
+  describeChild // MUI prop that adds aria-describedby
+>
+  <span>
+    <Button
+      variant="outlined"
+      sx={{ mt: 4 }}
+      onClick={handleExport}
+      disabled={dbImages.length === 0}
+      startIcon={<DownloadIcon />}
+    >
+      Export Search Database
+    </Button>
+  </span>
+</Tooltip>
+        title={dbImages.length === 0 ? 'No images in database to export' : 'Export search database as a JSON file'}
+        arrow
+      >
+        <span>
+          <Button
+            variant="outlined"
+            sx={{ mt: 4 }}
+            onClick={handleExport}
+            disabled={dbImages.length === 0}
+            startIcon={<DownloadIcon />}
+          >
+            Export Search Database
+          </Button>
+        </span>
+      </Tooltip>
 
       <Snackbar
         open={snackbar.open}
