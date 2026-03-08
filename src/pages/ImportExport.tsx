@@ -17,11 +17,12 @@ import DownloadIcon from '@mui/icons-material/Download';
 // Simulated image search database (in-memory for now)
 const imageSearchDBKey = 'collectease-image-search-db';
 
-function saveImagesToSearchDB(images: string[]) {
+function saveImagesToSearchDB(images: string[]): string[] {
   // Save images to localStorage for persistence
   const existing = JSON.parse(localStorage.getItem(imageSearchDBKey) || '[]');
   const updated = [...existing, ...images];
   localStorage.setItem(imageSearchDBKey, JSON.stringify(updated));
+  return updated;
 }
 
 function getImagesFromSearchDB(): string[] {
@@ -32,7 +33,8 @@ export default function ImportExport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<string[]>([]);
   const [searchable, setSearchable] = useState(false);
-  const [dbImages, setDbImages] = useState<string[]>(getImagesFromSearchDB());
+  // Use lazy initializer to avoid reading from localStorage on every re-render
+  const [dbImages, setDbImages] = useState<string[]>(() => getImagesFromSearchDB());
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
   const showMessage = (message: string, severity: 'success' | 'error' = 'success') => {
@@ -42,24 +44,26 @@ export default function ImportExport() {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
-      const newImages: string[] = [];
-      let loaded = 0;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.type.startsWith('image/')) {
+      const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+      const nonImageFiles = Array.from(files).filter(f => !f.type.startsWith('image/'));
+
+      if (imageFiles.length > 0) {
+        const newImages: string[] = [];
+        let loaded = 0;
+        imageFiles.forEach((file) => {
           const reader = new FileReader();
           reader.onload = (e) => {
             const imageUrl = e.target?.result as string;
             newImages.push(imageUrl);
             loaded++;
-            if (loaded === files.length) {
+
+            if (loaded === imageFiles.length) {
               setImages((prev) => {
                 const updatedImages = [...prev, ...newImages];
                 if (searchable) {
-                  // Add the updated list to the search database
-                  saveImagesToSearchDB(updatedImages);
-                  setDbImages(getImagesFromSearchDB());
-                  showMessage('Images imported and added to the search database!');
+                  const updatedDb = saveImagesToSearchDB(newImages); // Only save the NEW images to DB
+                  setDbImages(updatedDb);
+                  showMessage(`${newImages.length} images imported and added to search database!`);
                 } else {
                   showMessage(`${newImages.length} images imported successfully!`);
                 }
@@ -68,17 +72,25 @@ export default function ImportExport() {
             }
           };
           reader.readAsDataURL(file);
-        } else {
-          // For non-image files, just read as text
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const text = e.target?.result;
-            showMessage('File imported successfully!');
-            console.log('Imported file contents:', text);
-          };
-          reader.readAsText(file);
-        }
+        });
       }
+
+      nonImageFiles.forEach((file) => {
+        // For non-image files, just read as text
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const text = e.target?.result;
+          showMessage(`File ${file.name} imported successfully!`);
+          console.log('Imported file contents:', text);
+        };
+        reader.onerror = () => {
+          showMessage(`Failed to read ${file.name}`, 'error');
+        };
+        reader.readAsText(file);
+      });
+
+      // Clear the input value so the same file can be selected again
+      event.target.value = '';
     }
   };
 
@@ -170,6 +182,7 @@ export default function ImportExport() {
                 <img
                   src={img}
                   alt={`Imported item ${idx + 1}`}
+                  loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
               </Box>
@@ -208,6 +221,7 @@ export default function ImportExport() {
                 <img
                   src={img}
                   alt={`Database item ${idx + 1}`}
+                  loading="lazy"
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 />
               </Box>
@@ -217,11 +231,11 @@ export default function ImportExport() {
       )}
       <Tooltip
         title={
-          dbImages.length === 0 ? 'No data available to export' : 'Download search database as JSON'
+          dbImages.length === 0 ? 'No images in database to export' : 'Download search database as JSON'
         }
         arrow
         describeChild
-        <Box component="span" sx={{ display: 'inline-block', mt: 4 }}>
+      >
         <span style={{ display: 'inline-block', marginTop: '32px' }}>
           <Button
             variant="outlined"
@@ -231,7 +245,7 @@ export default function ImportExport() {
             sx={{ mt: 0 }}
           >
             Export Search Database
-        </Box>
+          </Button>
         </span>
       </Tooltip>
 
