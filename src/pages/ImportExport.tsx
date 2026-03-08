@@ -73,6 +73,9 @@ export default function ImportExport() {
           showMessage(`File ${file.name} imported successfully!`);
           console.log('Imported file contents:', text);
         };
+        reader.onerror = () => {
+          showMessage(`Failed to read ${file.name}`, 'error');
+        };
         reader.readAsText(file);
       });
 
