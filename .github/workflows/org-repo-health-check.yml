@@ -1,1 +1,88 @@
-404: Not Found
+name: PR and Bug Triage
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Every 6 hours
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Triage open pull requests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          prs=$(gh pr list --repo "$REPO" --state open --json number,title,mergeStateStatus,isDraft,author,additions,deletions,headRefName)
+          count=$(echo "$prs" | jq 'length')
+          echo "Found $count open PR(s)."
+
+          if [ "$count" -eq 0 ]; then
+            exit 0
+          fi
+
+          echo "$prs" | jq -c '.[]' | while read -r pr; do
+            number=$(echo "$pr" | jq -r '.number')
+            title=$(echo "$pr" | jq -r '.title')
+            merge_state=$(echo "$pr" | jq -r '.mergeStateStatus')
+            is_draft=$(echo "$pr" | jq -r '.isDraft')
+            additions=$(echo "$pr" | jq -r '.additions')
+            deletions=$(echo "$pr" | jq -r '.deletions')
+            changed=$((additions + deletions))
+
+            echo "Processing PR #$number ($title)"
+
+            # Base labeling
+            gh pr edit "$number" --repo "$REPO" --add-label "needs-review" || true
+
+            # Prioritize by size and mergeability
+            if [ "$merge_state" = "DIRTY" ]; then
+              gh pr edit "$number" --repo "$REPO" --add-label "priority:high" --add-label "has-conflicts" || true
+            elif [ "$changed" -gt 800 ]; then
+              gh pr edit "$number" --repo "$REPO" --add-label "priority:medium" --add-label "size:xl" || true
+            else
+              gh pr edit "$number" --repo "$REPO" --add-label "priority:normal" || true
+            fi
+
+            # Add actionable comment for conflicted PRs
+            if [ "$merge_state" = "DIRTY" ]; then
+              gh pr comment "$number" --repo "$REPO" --body "Automated triage: this PR currently has merge conflicts. Please update the branch with the latest base branch and re-run checks." || true
+            fi
+
+            # Skip draft PRs for automation note
+            if [ "$is_draft" = "true" ]; then
+              gh pr edit "$number" --repo "$REPO" --add-label "draft" || true
+            fi
+          done
+
+      - name: Triage open issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          issues=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title,labels)
+          count=$(echo "$issues" | jq 'length')
+          echo "Found $count open issue(s)."
+
+          if [ "$count" -eq 0 ]; then
+            exit 0
+          fi
+
+          echo "$issues" | jq -c '.[]' | while read -r issue; do
+            number=$(echo "$issue" | jq -r '.number')
+            title=$(echo "$issue" | jq -r '.title' | tr '[:upper:]' '[:lower:]')
+
+            if echo "$title" | grep -Eq 'security|vulnerability|xss|sql injection|rce'; then
+              gh issue edit "$number" --repo "$REPO" --add-label "severity:critical" --add-label "security" || true
+            elif echo "$title" | grep -Eq 'crash|data loss|broken|cannot|fails|error'; then
+              gh issue edit "$number" --repo "$REPO" --add-label "severity:high" || true
+            else
+              gh issue edit "$number" --repo "$REPO" --add-label "severity:normal" || true
+            fi
+          done
