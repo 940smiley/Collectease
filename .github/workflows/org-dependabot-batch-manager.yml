@@ -1,1 +1,66 @@
-404: Not Found
+name: Dependabot Batch Manager
+
+on:
+  schedule:
+    - cron: '30 */6 * * *' # Every 6 hours
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  process-dependabot-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install dependencies
+        if: hashFiles('package-lock.json', 'package.json') != ''
+        run: npm ci || npm install
+
+      - name: Find open Dependabot PRs
+        id: deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr list --repo "$REPO" --state open --author "app/dependabot" --json number,headRefName > dependabot-prs.json
+          count=$(jq 'length' dependabot-prs.json)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Found $count Dependabot PR(s)."
+
+      - name: Apply lint/build fixes on each Dependabot branch
+        if: steps.deps.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          jq -c '.[]' dependabot-prs.json | while read -r pr; do
+            number=$(echo "$pr" | jq -r '.number')
+            branch=$(echo "$pr" | jq -r '.headRefName')
+            echo "Processing Dependabot PR #$number on branch $branch"
+
+            git fetch origin "$branch"
+            git checkout "$branch"
+
+            npm run lint -- --fix || true
+            npm run build || true
+
+            if ! git diff --quiet; then
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git add -A
+              git commit -m "chore: auto-fix dependabot PR checks"
+              git push origin "$branch"
+            fi
+
+            gh pr merge "$number" --repo "$REPO" --auto --squash || true
+          done
