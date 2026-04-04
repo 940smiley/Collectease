@@ -60,3 +60,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh issue create --title "Security Vulnerabilities Found" --body "Automated security audit detected vulnerabilities in dependencies. Some may have been fixed automatically. Please review the workflow logs for details." --label "security" || echo "Issue already exists or could not be created"
+

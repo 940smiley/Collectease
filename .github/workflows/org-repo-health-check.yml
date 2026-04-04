@@ -86,3 +86,4 @@ jobs:
               gh issue edit "$number" --repo "$REPO" --add-label "severity:normal" || true
             fi
           done
+

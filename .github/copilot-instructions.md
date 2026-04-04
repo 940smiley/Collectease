@@ -7,3 +7,4 @@
 - Organize code into modular folders: components, pages, services, store, utils.
 - Prioritize clean, maintainable, and scalable code for future cross-platform support (web, desktop, mobile).
 - Follow best practices for state management and API integration.
+

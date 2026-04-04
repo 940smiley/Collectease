@@ -61,3 +61,4 @@ jobs:
 
           echo "### 🐛 Open Issues" >> $GITHUB_STEP_SUMMARY
           gh issue list --limit 10 --json number,title,labels --template '{{range .}}- Issue #{{.number}}: {{.title}} {{range .labels}}[{{.name}}]{{end}}\n{{end}}' >> $GITHUB_STEP_SUMMARY || echo "No open issues found." >> $GITHUB_STEP_SUMMARY
+

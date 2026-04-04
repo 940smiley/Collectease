@@ -54,3 +54,4 @@ jobs:
           commit_message: "chore: fix dependabot compatibility and formatting"
           skip_fetch: true
           skip_checkout: true
+

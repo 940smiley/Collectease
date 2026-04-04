@@ -5,3 +5,4 @@
 ## 2025-05-15 - [Synchronous I/O in React Lifecycle]
 **Learning:** Accessing `localStorage` directly in the component body or during state initialization without a lazy initializer causes synchronous I/O on every re-render.
 **Action:** Use the `useState(() => getFromLocalStorage())` pattern to ensure expensive or synchronous initializations only run once per component mount.
+

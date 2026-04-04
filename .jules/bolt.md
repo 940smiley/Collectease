@@ -1,3 +1,4 @@
 ## 2025-05-19 - Optimization of LocalStorage-heavy Component
 **Learning:** Reading from LocalStorage in the component body blocks rendering and can be a significant bottleneck if the stored data is large. Additionally, sequential processing of file imports using multiple FileReader calls with a manual counter is prone to bugs and slower than parallel processing.
 **Action:** Always use lazy initialization for useState when reading from LocalStorage (`useState(() => getFromDB())`). Use `Promise.all` to parallelize asynchronous operations like file reading for better performance and cleaner code.
+

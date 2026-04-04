@@ -64,3 +64,4 @@ jobs:
 
             gh pr merge "$number" --repo "$REPO" --auto --squash || true
           done
+
