@@ -1,1 +1,97 @@
-404: Not Found
+name: Dependabot Batch Manager
+
+on:
+  schedule:
+    - cron: "30 */6 * * *" # Every 6 hours
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-batch-manager
+  cancel-in-progress: false
+
+jobs:
+  process-dependabot-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+          cache: "npm"
+
+      - name: Install dependencies
+        if: hashFiles('package-lock.json', 'package.json') != ''
+        run: npm ci || npm install
+
+      - name: Find open Dependabot PRs
+        id: deps
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh pr list --repo "$REPO" --state open --search "author:dependabot[bot]" --json number,headRefName,mergeStateStatus,isDraft > dependabot-prs.json
+          count=$(jq 'length' dependabot-prs.json)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Found $count Dependabot PR(s)."
+
+      - name: Apply lint/build fixes on each Dependabot branch
+        if: steps.deps.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          jq -c '.[]' dependabot-prs.json | while read -r pr; do
+            number=$(echo "$pr" | jq -r '.number')
+            branch=$(echo "$pr" | jq -r '.headRefName')
+            draft=$(echo "$pr" | jq -r '.isDraft')
+
+            echo "Processing Dependabot PR #$number on branch $branch"
+            git checkout --detach
+            git reset --hard
+            git clean -fd
+
+            if ! git fetch origin "$branch":"$branch"; then
+              echo "Could not fetch branch $branch; skipping PR #$number"
+              continue
+            fi
+
+            git checkout "$branch"
+
+            npm run lint -- --fix || true
+            npm run build || true
+
+            if ! git diff --quiet; then
+              git add -A
+              git commit -m "chore: auto-fix dependabot PR checks"
+              git push origin "HEAD:$branch"
+            else
+              echo "No auto-fix changes for PR #$number"
+            fi
+
+            if [ "$draft" = "false" ]; then
+              gh pr merge "$number" --repo "$REPO" --auto --squash || true
+            fi
+          done
+
+      - name: Upload Dependabot processing log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependabot-prs
+          path: dependabot-prs.json
+          if-no-files-found: ignore

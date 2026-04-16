@@ -5,32 +5,43 @@ on:
     types: [labeled, opened, synchronize, reopened, ready_for_review]
   check_suite:
     types: [completed]
-  status:
 
 permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: auto-merge-prs
+  cancel-in-progress: false
+
 jobs:
   auto-merge:
-    if: github.event.pull_request.draft == false
+    if: github.event_name == 'pull_request' || github.event.check_suite.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Enable auto-merge for PR
+      - name: Enable auto-merge where eligible
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
-          # Use gh CLI to enable auto-merge (squash)
-          # Only if checks are passing and not a draft
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            gh pr merge --auto --squash "${{ github.event.pull_request.number }}" || echo "Could not enable auto-merge"
-          else
-            # For other triggers, we might need to find the PR
-            PR_NUMBER=$(gh pr list --head "${{ github.ref_name }}" --format "{{.number}}")
-            if [ -n "$PR_NUMBER" ]; then
-              gh pr merge --auto --squash "$PR_NUMBER" || echo "Could not enable auto-merge for PR $PR_NUMBER"
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            if [ "${{ github.event.pull_request.draft }}" = "true" ]; then
+              echo "Draft PR detected; skipping"
+              exit 0
             fi
+
+            gh pr merge "${{ github.event.pull_request.number }}" --repo "$REPO" --auto --squash || true
+            exit 0
           fi
+
+          gh pr list --repo "$REPO" --state open --json number,isDraft,mergeStateStatus | jq -c '.[]' | while read -r pr; do
+            number=$(echo "$pr" | jq -r '.number')
+            draft=$(echo "$pr" | jq -r '.isDraft')
+            merge_state=$(echo "$pr" | jq -r '.mergeStateStatus')
+
+            if [ "$draft" = "false" ] && [ "$merge_state" = "CLEAN" ]; then
+              gh pr merge "$number" --repo "$REPO" --auto --squash || true
+            fi
+          done
