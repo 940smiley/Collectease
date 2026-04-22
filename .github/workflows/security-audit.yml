@@ -22,7 +22,7 @@ jobs:
       - name: Node.js Security Audit
         if: hashFiles('package-lock.json') != ''
         run: |
-          npm audit --audit-level=high || (echo "NODE_AUDIT_FAIL=true" >> $GITHUB_ENV && true)
+          npm audit --audit-level=high || echo "NODE_AUDIT_FAIL=true" >> $GITHUB_ENV
           npm audit fix || true
         continue-on-error: true
 

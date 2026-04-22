@@ -57,7 +57,7 @@ jobs:
           fi
 
           echo "### 🏗️ Open Pull Requests" >> $GITHUB_STEP_SUMMARY
-          gh pr list --limit 10 --json number,title,author,createdAt --template '{{range .}}- PR #{{.number}}: {{.title}} by @{{.author.login}} ({{.createdAt}})\n{{end}}' >> $GITHUB_STEP_SUMMARY || echo "No open PRs found." >> $GITHUB_STEP_SUMMARY
+          gh pr list --state open --limit 10 --json number,title,author,createdAt --template '{{range .}}- PR #{{.number}}: {{.title}} by @{{.author.login}} ({{.createdAt}})\n{{end}}' >> $GITHUB_STEP_SUMMARY || echo "No open PRs found." >> $GITHUB_STEP_SUMMARY
 
           echo "### 🐛 Open Issues" >> $GITHUB_STEP_SUMMARY
           gh issue list --limit 10 --json number,title,labels --template '{{range .}}- Issue #{{.number}}: {{.title}} {{range .labels}}[{{.name}}]{{end}}\n{{end}}' >> $GITHUB_STEP_SUMMARY || echo "No open issues found." >> $GITHUB_STEP_SUMMARY
