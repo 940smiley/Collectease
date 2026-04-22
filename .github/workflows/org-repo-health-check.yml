@@ -2,7 +2,7 @@ name: PR and Bug Triage
 
 on:
   schedule:
-    - cron: '0 */6 * * *' # Every 6 hours
+    - cron: "0 */6 * * *" # Every 6 hours
   workflow_dispatch:
 
 permissions:
@@ -10,18 +10,51 @@ permissions:
   pull-requests: write
   issues: write
 
+concurrency:
+  group: repo-pr-bug-triage
+  cancel-in-progress: false
+
 jobs:
   triage:
     runs-on: ubuntu-latest
     steps:
+      - name: Ensure expected labels exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          ensure_label() {
+            local name="$1"
+            local color="$2"
+            local desc="$3"
+            gh label create "$name" --repo "$REPO" --color "$color" --description "$desc" 2>/dev/null || \
+              gh label edit "$name" --repo "$REPO" --color "$color" --description "$desc" >/dev/null
+          }
+
+          ensure_label "needs-review" "0366D6" "Queued for reviewer assignment"
+          ensure_label "has-conflicts" "B60205" "PR has merge conflicts"
+          ensure_label "draft" "6E7781" "Draft pull request"
+          ensure_label "size:xl" "5319E7" "Large PR"
+          ensure_label "priority:high" "D93F0B" "High priority"
+          ensure_label "priority:medium" "FBCA04" "Medium priority"
+          ensure_label "priority:normal" "0E8A16" "Normal priority"
+          ensure_label "severity:critical" "B60205" "Critical issue"
+          ensure_label "severity:high" "D93F0B" "High severity issue"
+          ensure_label "severity:normal" "0E8A16" "Normal severity issue"
+          ensure_label "security" "B60205" "Security-related issue"
+
       - name: Triage open pull requests
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
-          prs=$(gh pr list --repo "$REPO" --state open --json number,title,mergeStateStatus,isDraft,author,additions,deletions,headRefName)
+          set -euo pipefail
+          prs=$(gh pr list --repo "$REPO" --state open --limit 200 --json number,title,mergeStateStatus,isDraft,additions,deletions)
           count=$(echo "$prs" | jq 'length')
           echo "Found $count open PR(s)."
+          echo "$prs" > pr-triage-report.json
 
           if [ "$count" -eq 0 ]; then
             exit 0
@@ -32,30 +65,30 @@ jobs:
             title=$(echo "$pr" | jq -r '.title')
             merge_state=$(echo "$pr" | jq -r '.mergeStateStatus')
             is_draft=$(echo "$pr" | jq -r '.isDraft')
-            additions=$(echo "$pr" | jq -r '.additions')
-            deletions=$(echo "$pr" | jq -r '.deletions')
+            additions=$(echo "$pr" | jq -r '.additions // 0')
+            deletions=$(echo "$pr" | jq -r '.deletions // 0')
             changed=$((additions + deletions))
+            conflict_comment="Automated triage: this PR currently has merge conflicts. Please update with the latest base branch and re-run checks."
 
             echo "Processing PR #$number ($title)"
-
-            # Base labeling
             gh pr edit "$number" --repo "$REPO" --add-label "needs-review" || true
 
-            # Prioritize by size and mergeability
             if [ "$merge_state" = "DIRTY" ]; then
               gh pr edit "$number" --repo "$REPO" --add-label "priority:high" --add-label "has-conflicts" || true
+
+              conflict_note="Automated triage: this PR currently has merge conflicts. Please update with the latest base branch and re-run checks."
+              existing_conflict_note_count=$(gh pr view "$number" --repo "$REPO" --json comments 2>/dev/null | jq --arg msg "$conflict_note" '[.comments[] | select(.body == $msg)] | length' || echo "0")
+              if [ "${existing_conflict_note_count:-0}" -eq 0 ]; then
+                gh pr comment "$number" --repo "$REPO" --body "$conflict_note" || true
+              else
+                echo "Conflict triage comment already exists for PR #$number; skipping duplicate comment."
+              fi
             elif [ "$changed" -gt 800 ]; then
               gh pr edit "$number" --repo "$REPO" --add-label "priority:medium" --add-label "size:xl" || true
             else
               gh pr edit "$number" --repo "$REPO" --add-label "priority:normal" || true
             fi
 
-            # Add actionable comment for conflicted PRs
-            if [ "$merge_state" = "DIRTY" ]; then
-              gh pr comment "$number" --repo "$REPO" --body "Automated triage: this PR currently has merge conflicts. Please update the branch with the latest base branch and re-run checks." || true
-            fi
-
-            # Skip draft PRs for automation note
             if [ "$is_draft" = "true" ]; then
               gh pr edit "$number" --repo "$REPO" --add-label "draft" || true
             fi
@@ -66,9 +99,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
-          issues=$(gh issue list --repo "$REPO" --state open --limit 100 --json number,title,labels)
+          set -euo pipefail
+          issues=$(gh issue list --repo "$REPO" --state open --limit 200 --json number,title)
           count=$(echo "$issues" | jq 'length')
           echo "Found $count open issue(s)."
+          echo "$issues" > issue-triage-report.json
 
           if [ "$count" -eq 0 ]; then
             exit 0
@@ -86,3 +121,13 @@ jobs:
               gh issue edit "$number" --repo "$REPO" --add-label "severity:normal" || true
             fi
           done
+
+      - name: Upload triage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: triage-reports
+          path: |
+            pr-triage-report.json
+            issue-triage-report.json
+          if-no-files-found: ignore

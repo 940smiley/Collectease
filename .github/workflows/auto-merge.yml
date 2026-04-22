@@ -10,8 +10,13 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: auto-merge-prs
+  cancel-in-progress: false
+
 jobs:
   auto-merge:
+    if: github.event_name == 'pull_request' || github.event.check_suite.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Enable auto-merge where eligible
@@ -19,17 +24,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
+          set -euo pipefail
+
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             if [ "${{ github.event.pull_request.draft }}" = "true" ]; then
               echo "Draft PR detected; skipping"
               exit 0
             fi
+
             gh pr merge "${{ github.event.pull_request.number }}" --repo "$REPO" --auto --squash || true
             exit 0
           fi
 
-          # check_suite path: enable auto-merge on mergeable open PRs
-          gh pr list --repo "$REPO" --state open --json number,isDraft,mergeStateStatus | jq -c '.[]' | while read -r pr; do
+          gh pr list --repo "$REPO" --state open --limit 200 --json number,isDraft,mergeStateStatus | jq -c '.[]' | while read -r pr; do
             number=$(echo "$pr" | jq -r '.number')
             draft=$(echo "$pr" | jq -r '.isDraft')
             merge_state=$(echo "$pr" | jq -r '.mergeStateStatus')
