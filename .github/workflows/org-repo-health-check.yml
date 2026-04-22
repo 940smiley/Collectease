@@ -68,6 +68,7 @@ jobs:
             additions=$(echo "$pr" | jq -r '.additions // 0')
             deletions=$(echo "$pr" | jq -r '.deletions // 0')
             changed=$((additions + deletions))
+            conflict_comment="Automated triage: this PR currently has merge conflicts. Please update with the latest base branch and re-run checks."
 
             echo "Processing PR #$number ($title)"
             gh pr edit "$number" --repo "$REPO" --add-label "needs-review" || true
