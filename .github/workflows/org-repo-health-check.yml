@@ -74,7 +74,16 @@ jobs:
 
             if [ "$merge_state" = "DIRTY" ]; then
               gh pr edit "$number" --repo "$REPO" --add-label "priority:high" --add-label "has-conflicts" || true
-              gh pr comment "$number" --repo "$REPO" --body "Automated triage: this PR currently has merge conflicts. Please update with the latest base branch and re-run checks." || true
+              existing_conflict_comment=$(
+                gh pr view "$number" --repo "$REPO" --json comments --jq '.comments[] | select(.author.login == "github-actions[bot]") | .body' \
+                  | grep -Fxc "Automated triage: this PR currently has merge conflicts. Please update with the latest base branch and re-run checks." || true
+              )
+
+              if [ "${existing_conflict_comment:-0}" -eq 0 ]; then
+                gh pr comment "$number" --repo "$REPO" --body "Automated triage: this PR currently has merge conflicts. Please update with the latest base branch and re-run checks." || true
+              else
+                echo "Conflict notice already present for PR #$number; skipping duplicate comment."
+              fi
             elif [ "$changed" -gt 800 ]; then
               gh pr edit "$number" --repo "$REPO" --add-label "priority:medium" --add-label "size:xl" || true
             else

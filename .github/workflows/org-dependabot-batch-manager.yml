@@ -39,7 +39,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          gh pr list --repo "$REPO" --state open --search "author:dependabot[bot]" --json number,headRefName,mergeStateStatus,isDraft > dependabot-prs.json
+          gh pr list --repo "$REPO" --state open --search "author:dependabot[bot]" --limit 200 --json number,headRefName,mergeStateStatus,isDraft > dependabot-prs.json
           count=$(jq 'length' dependabot-prs.json)
           echo "count=$count" >> "$GITHUB_OUTPUT"
           echo "Found $count Dependabot PR(s)."
