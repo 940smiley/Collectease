@@ -74,7 +74,14 @@ jobs:
 
             if [ "$merge_state" = "DIRTY" ]; then
               gh pr edit "$number" --repo "$REPO" --add-label "priority:high" --add-label "has-conflicts" || true
-              gh pr comment "$number" --repo "$REPO" --body "Automated triage: this PR currently has merge conflicts. Please update with the latest base branch and re-run checks." || true
+
+              conflict_note="Automated triage: this PR currently has merge conflicts. Please update with the latest base branch and re-run checks."
+              existing_conflict_note_count=$(gh pr view "$number" --repo "$REPO" --json comments 2>/dev/null | jq --arg msg "$conflict_note" '[.comments[] | select(.body == $msg)] | length' || echo "0")
+              if [ "${existing_conflict_note_count:-0}" -eq 0 ]; then
+                gh pr comment "$number" --repo "$REPO" --body "$conflict_note" || true
+              else
+                echo "Conflict triage comment already exists for PR #$number; skipping duplicate comment."
+              fi
             elif [ "$changed" -gt 800 ]; then
               gh pr edit "$number" --repo "$REPO" --add-label "priority:medium" --add-label "size:xl" || true
             else
