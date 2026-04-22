@@ -73,7 +73,7 @@ jobs:
         continue-on-error: true
 
       - name: Setup Rust
-        uses: actions/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
         if: hashFiles('**/*.rs') != ''
