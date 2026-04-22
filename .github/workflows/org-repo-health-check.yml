@@ -68,13 +68,18 @@ jobs:
             additions=$(echo "$pr" | jq -r '.additions // 0')
             deletions=$(echo "$pr" | jq -r '.deletions // 0')
             changed=$((additions + deletions))
+            conflict_comment="Automated triage: this PR currently has merge conflicts. Please update with the latest base branch and re-run checks."
 
             echo "Processing PR #$number ($title)"
             gh pr edit "$number" --repo "$REPO" --add-label "needs-review" || true
 
             if [ "$merge_state" = "DIRTY" ]; then
               gh pr edit "$number" --repo "$REPO" --add-label "priority:high" --add-label "has-conflicts" || true
-              gh pr comment "$number" --repo "$REPO" --body "Automated triage: this PR currently has merge conflicts. Please update with the latest base branch and re-run checks." || true
+              if ! gh pr view "$number" --repo "$REPO" --json comments --jq '.comments[].body' | grep -Fxq "$conflict_comment"; then
+                gh pr comment "$number" --repo "$REPO" --body "$conflict_comment" || true
+              else
+                echo "Conflict comment already exists for PR #$number; skipping duplicate comment."
+              fi
             elif [ "$changed" -gt 800 ]; then
               gh pr edit "$number" --repo "$REPO" --add-label "priority:medium" --add-label "size:xl" || true
             else
