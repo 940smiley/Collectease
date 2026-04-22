@@ -60,6 +60,8 @@ jobs:
             exit 0
           fi
 
+          conflict_message="Automated triage: this PR currently has merge conflicts. Please update with the latest base branch and re-run checks."
+
           echo "$prs" | jq -c '.[]' | while read -r pr; do
             number=$(echo "$pr" | jq -r '.number')
             title=$(echo "$pr" | jq -r '.title')
@@ -74,7 +76,12 @@ jobs:
 
             if [ "$merge_state" = "DIRTY" ]; then
               gh pr edit "$number" --repo "$REPO" --add-label "priority:high" --add-label "has-conflicts" || true
-              gh pr comment "$number" --repo "$REPO" --body "Automated triage: this PR currently has merge conflicts. Please update with the latest base branch and re-run checks." || true
+              existing_conflict_comment_count=$(gh pr view "$number" --repo "$REPO" --json comments --jq --arg msg "$conflict_message" '[.comments[] | select(.author.login == "github-actions[bot]" and (.body | contains($msg)))] | length' || echo "0")
+              if [ "$existing_conflict_comment_count" = "0" ]; then
+                gh pr comment "$number" --repo "$REPO" --body "$conflict_message" || true
+              else
+                echo "Conflict comment already exists for PR #$number; skipping duplicate comment."
+              fi
             elif [ "$changed" -gt 800 ]; then
               gh pr edit "$number" --repo "$REPO" --add-label "priority:medium" --add-label "size:xl" || true
             else

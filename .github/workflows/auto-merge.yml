@@ -36,7 +36,7 @@ jobs:
             exit 0
           fi
 
-          gh pr list --repo "$REPO" --state open --json number,isDraft,mergeStateStatus | jq -c '.[]' | while read -r pr; do
+          gh pr list --repo "$REPO" --state open --limit 200 --json number,isDraft,mergeStateStatus | jq -c '.[]' | while read -r pr; do
             number=$(echo "$pr" | jq -r '.number')
             draft=$(echo "$pr" | jq -r '.isDraft')
             merge_state=$(echo "$pr" | jq -r '.mergeStateStatus')
