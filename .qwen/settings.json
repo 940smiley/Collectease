@@ -1,0 +1,9 @@
+{
+  "name": "Collectease",
+  "version": "1.0.0",
+  "description": "Qwen settings for Collectease project",
+  "preferences": {
+    "language": "en",
+    "autoSave": true
+  }
+}

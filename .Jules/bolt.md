@@ -1,7 +1,3 @@
-## 2025-05-15 - [Route-based Code Splitting Impact]
-**Learning:** For an MUI-based React application, initial bundle sizes can grow rapidly. Implementing `React.lazy` and `Suspense` for all main routes reduced the initial JavaScript payload from 448.30 kB to 378.56 kB (a ~70 kB or 15.5% reduction), improving the Time to Interactive (TTI) for the initial page load.
-**Action:** Always implement route-based code splitting for top-level page components to keep the entry bundle lean.
-
-## 2025-05-15 - [Synchronous I/O in React Lifecycle]
-**Learning:** Accessing `localStorage` directly in the component body or during state initialization without a lazy initializer causes synchronous I/O on every re-render.
-**Action:** Use the `useState(() => getFromLocalStorage())` pattern to ensure expensive or synchronous initializations only run once per component mount.
+## 2025-05-19 - Optimization of LocalStorage-heavy Component
+**Learning:** Reading from LocalStorage in the component body blocks rendering and can be a significant bottleneck if the stored data is large. Additionally, sequential processing of file imports using multiple FileReader calls with a manual counter is prone to bugs and slower than parallel processing.
+**Action:** Always use lazy initialization for useState when reading from LocalStorage (`useState(() => getFromDB())`). Use `Promise.all` to parallelize asynchronous operations like file reading for better performance and cleaner code.

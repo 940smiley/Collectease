@@ -1,0 +1,25 @@
+# Agent Context: Collectease
+
+## Project Overview
+Collectease - A modern web application built with Vite and React/TypeScript.
+
+## Key Technologies
+- **Framework**: React
+- **Language**: TypeScript
+- **Build**: Vite
+- **Package**: npm
+
+## Main Files & Directories
+- `src/` - Source code
+- `public/` - Static assets
+- `index.html` - Entry point
+- `vite.config.ts` - Vite configuration
+- `tsconfig.json` - TypeScript config
+
+## Purpose
+A web application, likely for data collection or management based on the name.
+
+## Notes
+- Modern Vite build
+- TypeScript throughout
+- ESLint configured
