@@ -1,48 +1,47 @@
 # Collectease
 
-Collectease is a collectibles management app designed to help you organize, value, and share your collection. The app features a modern GUI built with React, Material-UI, and Vite, and is optimized for deployment on GitHub Pages.
+**Collectease** is a professional collectibles management application designed to help enthusiasts organize, value, and share their collections with ease. Built with a modern tech stack, it provides powerful tools for automated valuation and marketplace integration.
 
-## Features
+## Key Features
 
-- **Category Support:** Organize your collection with categories and subcategories inspired by platforms like eBay, eBid, and Colnect.
-- **Pricing Data & Valuation:** Automatically pulls pricing data from eBay sold items, expanding the search as needed to calculate an average value.
-- **Collection Sharing:** Share your entire collection or specific sections with others.
-- **Import & Export:** Import from sources like PriceCharting and export in compatible formats.
-- **Marketplace Integration:** Easily list items on eBay, Facebook Marketplace, and more.
+- **Hierarchical Categorization:** Deep category and subcategory support inspired by major auction platforms like eBay and Colnect.
+- **Automated Valuation:** Real-time pricing data retrieval from eBay sold listings to calculate accurate market values.
+- **Social Sharing:** Granular sharing controls for individual items or entire collection sections.
+- **Data Mobility:** Robust import/export tools supporting PriceCharting and other common formats.
+- **Marketplace Sync:** One-click listing preparation for eBay and Facebook Marketplace.
 
 ## Tech Stack
-- React + TypeScript
-- Vite
-- Material-UI (MUI)
 
-## Project Structure
-- `src/components` – Reusable UI components
-- `src/pages` – Main pages (Dashboard, Collection, etc.)
-- `src/services` – API integrations
-- `src/store` – State management
-- `src/utils` – Helper functions
+- **Frontend:** React 19, TypeScript 5.9
+- **Build Tool:** Vite 7
+- **UI Framework:** Material-UI (MUI)
+- **State Management:** Zustand (Collection Store)
 
 ## Getting Started
 
-1. Install dependencies:
-   ```pwsh
-   npm install
-   ```
-2. Start the development server:
-   ```pwsh
-   npm run dev
-   ```
-3. Build for production:
-   ```pwsh
-   npm run build
-   ```
+### Installation
+```bash
+npm install
+```
 
-## Roadmap
-- [ ] Build category and subcategory structure
-- [ ] Implement eBay pricing data integration
-- [ ] Add import/export functionality
-- [ ] Develop sharing and listing features
-- [ ] Launch on GitHub Pages
+### Development
+```bash
+npm run dev
+```
 
----
-Stay tuned for updates!
+### Production Build
+```bash
+npm run build
+```
+
+## TODO List
+
+- [ ] **Security Hardening:** Resolve high-severity vulnerabilities identified in the automated audit (CVE-2026-27606).
+- [ ] **API Optimization:** Refine the eBay pricing scraper to handle rate limiting more gracefully.
+- [ ] **UI Polish:** Implement a more cohesive design system using MUI's theming capabilities.
+- [ ] **Mobile Optimization:** Ensure the dashboard is fully responsive for mobile collectors.
+- [ ] **Testing:** Add unit tests for the `collectionStore` to prevent state regression.
+
+## License
+
+MIT License
